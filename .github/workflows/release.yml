@@ -86,33 +86,51 @@ jobs:
 
       - name: Setup WiX Toolset
         run: |
-          # Download and install WiX Toolset v3.11
-          Write-Host "Downloading WiX Toolset..."
-          Invoke-WebRequest -Uri "https://github.com/wixtoolset/wix3/releases/download/wix3111rtm/wix311.exe" -OutFile "wix311.exe"
+          # Download and install WiX Toolset v3.14
+          Write-Host "Downloading WiX Toolset v3.14..."
+          Invoke-WebRequest -Uri "https://github.com/wixtoolset/wix3/releases/download/wix314-rtm/wix314.exe" -OutFile "wix314.exe"
           
-          Write-Host "Installing WiX Toolset..."
-          Start-Process -FilePath "wix311.exe" -ArgumentList "/S" -Wait
+          Write-Host "Installing WiX Toolset v3.14..."
+          Start-Process -FilePath "wix314.exe" -ArgumentList "/quiet" -Wait
           
-          # Verify installation
-          Write-Host "Verifying WiX installation..."
-          if (Test-Path "C:\Program Files (x86)\WiX Toolset v3.11\bin") {
-            Write-Host "✅ WiX Toolset v3.11 installed successfully"
-            Get-ChildItem "C:\Program Files (x86)\WiX Toolset v3.11\bin" | Select-Object Name | Format-Table
+          # Give it a moment to complete installation
+          Start-Sleep -Seconds 5
+          
+          # Check for both possible installation paths
+          $wixPath = ""
+          if (Test-Path "C:\Program Files (x86)\WiX Toolset v3.14\bin") {
+            $wixPath = "C:\Program Files (x86)\WiX Toolset v3.14\bin"
+            Write-Host "✅ WiX Toolset v3.14 installed successfully at $wixPath"
+          } elseif (Test-Path "C:\Program Files\WiX Toolset v3.14\bin") {
+            $wixPath = "C:\Program Files\WiX Toolset v3.14\bin"
+            Write-Host "✅ WiX Toolset v3.14 installed successfully at $wixPath"
           } else {
-            Write-Error "❌ WiX Toolset installation failed"
+            Write-Host "❌ WiX Toolset installation failed. Checking available directories..."
+            Write-Host "Program Files (x86) contents:"
+            if (Test-Path "C:\Program Files (x86)") {
+              Get-ChildItem "C:\Program Files (x86)" | Where-Object { $_.Name -like "*WiX*" } | Select-Object Name
+            }
+            Write-Host "Program Files contents:"
+            if (Test-Path "C:\Program Files") {
+              Get-ChildItem "C:\Program Files" | Where-Object { $_.Name -like "*WiX*" } | Select-Object Name
+            }
             exit 1
           }
           
+          # Show what's in the bin directory
+          Write-Host "WiX bin directory contents:"
+          Get-ChildItem $wixPath | Select-Object Name | Format-Table
+          
           # Add WiX to PATH
-          $env:PATH += ";C:\Program Files (x86)\WiX Toolset v3.11\bin"
-          echo "C:\Program Files (x86)\WiX Toolset v3.11\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+          $env:PATH += ";$wixPath"
+          echo $wixPath | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
           
           # Verify candle.exe is available
           Write-Host "Verifying candle.exe..."
-          if (Test-Path "C:\Program Files (x86)\WiX Toolset v3.11\bin\candle.exe") {
-            Write-Host "✅ candle.exe found"
+          if (Test-Path "$wixPath\candle.exe") {
+            Write-Host "✅ candle.exe found at $wixPath\candle.exe"
           } else {
-            Write-Error "❌ candle.exe not found"
+            Write-Error "❌ candle.exe not found at $wixPath\candle.exe"
             exit 1
           }
         shell: powershell
@@ -165,20 +183,26 @@ jobs:
       - name: Build installer
         run: |
           # Find WiX installation path
-          $wixPath = ""
-          if (Test-Path "C:\Program Files (x86)\WiX Toolset v3.11\bin\wix.targets") {
-            $wixPath = "C:\Program Files (x86)\WiX Toolset v3.11\bin\wix.targets"
-          } elseif (Test-Path "C:\Program Files (x86)\WiX Toolset v3.14\bin\wix.targets") {
-            $wixPath = "C:\Program Files (x86)\WiX Toolset v3.14\bin\wix.targets"
+          $wixTargetsPath = ""
+          if (Test-Path "C:\Program Files (x86)\WiX Toolset v3.14\bin\wix.targets") {
+            $wixTargetsPath = "C:\Program Files (x86)\WiX Toolset v3.14\bin\wix.targets"
+          } elseif (Test-Path "C:\Program Files\WiX Toolset v3.14\bin\wix.targets") {
+            $wixTargetsPath = "C:\Program Files\WiX Toolset v3.14\bin\wix.targets"
+          } elseif (Test-Path "C:\Program Files (x86)\WiX Toolset v3.11\bin\wix.targets") {
+            $wixTargetsPath = "C:\Program Files (x86)\WiX Toolset v3.11\bin\wix.targets"
           } else {
-            Write-Error "WiX Toolset not found"
+            Write-Error "WiX Toolset targets not found"
+            Write-Host "Searched paths:"
+            Write-Host "- C:\Program Files (x86)\WiX Toolset v3.14\bin\wix.targets"
+            Write-Host "- C:\Program Files\WiX Toolset v3.14\bin\wix.targets"
+            Write-Host "- C:\Program Files (x86)\WiX Toolset v3.11\bin\wix.targets"
             exit 1
           }
           
-          Write-Host "Using WiX targets at: $wixPath"
+          Write-Host "Using WiX targets at: $wixTargetsPath"
           
           # Build the installer
-          msbuild win-copypasta/CopyPasta.Installer/CopyPasta.Installer.wixproj /p:Configuration=Release /p:Platform=x86 /p:WixTargetsPath="$wixPath" /verbosity:minimal
+          msbuild win-copypasta/CopyPasta.Installer/CopyPasta.Installer.wixproj /p:Configuration=Release /p:Platform=x86 /p:WixTargetsPath="$wixTargetsPath" /verbosity:minimal
         shell: powershell
 
       - name: Sign installer (if certificate available)
