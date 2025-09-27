@@ -60,7 +60,7 @@
 
     <ComponentGroup Id="ProductComponents" Directory="INSTALLFOLDER">
       <Component Id="MainExecutable" Guid="{C1A2B3D4-E5F6-7890-ABCD-123456789001}">
-        <File Id="CopyPasta.exe" Source="$(var.CopyPasta.TargetPath)" KeyPath="yes" />
+        <File Id="CopyPasta.exe" Source="$(var.CopyPasta.TargetDir)CopyPasta.exe" KeyPath="yes" />
       </Component>
       <Component Id="DepsJson" Guid="{C1A2B3D4-E5F6-7890-ABCD-123456789002}">
         <File Id="CopyPasta.deps.json" Source="$(var.CopyPasta.TargetDir)CopyPasta.deps.json" />
