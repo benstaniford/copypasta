@@ -11,6 +11,11 @@ on:
         required: true
         type: string
 
+permissions:
+  contents: write
+  actions: read
+  packages: write
+
 jobs:
   build-linux-cli:
     runs-on: ubuntu-latest
