@@ -62,14 +62,16 @@
       <Component Id="MainExecutable" Guid="*">
         <File Id="CopyPasta.exe" Source="$(var.CopyPasta.TargetPath)" KeyPath="yes" />
       </Component>
-      <Component Id="ConfigFiles" Guid="*">
+      <Component Id="DepsJson" Guid="*">
         <File Id="CopyPasta.deps.json" Source="$(var.CopyPasta.TargetDir)CopyPasta.deps.json" />
+      </Component>
+      <Component Id="RuntimeConfig" Guid="*">
         <File Id="CopyPasta.runtimeconfig.json" Source="$(var.CopyPasta.TargetDir)CopyPasta.runtimeconfig.json" />
       </Component>
       <Component Id="MainAssembly" Guid="*">
         <File Id="CopyPasta.dll" Source="$(var.CopyPasta.TargetDir)CopyPasta.dll" />
       </Component>
-      <Component Id="Dependencies" Guid="*">
+      <Component Id="NewtonsoftJson" Guid="*">
         <File Id="Newtonsoft.Json.dll" Source="$(var.CopyPasta.TargetDir)Newtonsoft.Json.dll" />
       </Component>
     </ComponentGroup>
