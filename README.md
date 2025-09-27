@@ -91,6 +91,7 @@ environment:
 
 - **Real-time sync** across all devices
 - **Text and image support** (PNG, JPG, GIF)
+- **Push notifications** so your clients know when the central clipboard has changed
 - **Persistent login** until logout
 - **Mobile-friendly** responsive design
 - **Secure authentication** with configurable credentials
