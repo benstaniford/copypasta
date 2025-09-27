@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Diagnostics;
 using Newtonsoft.Json;
 using Microsoft.Win32;
 
@@ -25,21 +26,37 @@ namespace CopyPasta
 
         public static Settings Load()
         {
+            Settings settings;
+            
             try
             {
                 if (File.Exists(SettingsPath))
                 {
                     var json = File.ReadAllText(SettingsPath);
-                    return JsonConvert.DeserializeObject<Settings>(json) ?? new Settings();
+                    settings = JsonConvert.DeserializeObject<Settings>(json) ?? new Settings();
+                }
+                else
+                {
+                    settings = new Settings();
                 }
             }
             catch (Exception ex)
             {
                 // Log error if needed, return default settings
                 System.Diagnostics.Debug.WriteLine($"Error loading settings: {ex.Message}");
+                settings = new Settings();
             }
 
-            return new Settings();
+            // Override settings if running under debugger
+            if (Debugger.IsAttached)
+            {
+                Logger.Log("Settings", "Debugger detected - using development settings");
+                settings.ServerEndpoint = "http://localhost:5000";
+                settings.Username = "user";
+                settings.Password = "password";
+            }
+
+            return settings;
         }
 
         public void Save()
