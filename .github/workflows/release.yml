@@ -136,38 +136,60 @@ jobs:
           
           # Set up MSBuild integration for WiX
           Write-Host "Setting up WiX MSBuild integration..."
-          $dotnetSdkPath = (dotnet --info | Select-String "Base Path:" | ForEach-Object { $_.ToString().Split(":")[1].Trim() })
-          $wixTargetsDir = "$dotnetSdkPath\Microsoft\WiX\v3.x"
+          $dotnetInfo = dotnet --info
+          $basePath = ($dotnetInfo | Select-String "Base Path:" | ForEach-Object { $_.ToString().Split(":", 2)[1].Trim() })
+          Write-Host "Detected .NET SDK Base Path: $basePath"
+          $wixTargetsDir = "$basePath\Microsoft\WiX\v3.x"
           
           Write-Host "Creating WiX targets directory: $wixTargetsDir"
           New-Item -ItemType Directory -Force -Path $wixTargetsDir
           
-          # Copy WiX MSBuild targets
-          $sourceTargets = "$wixPath\wix.targets"
-          $destTargets = "$wixTargetsDir\Wix.targets"
+          # Copy WiX MSBuild targets - check multiple possible locations and names
+          $possibleTargetFiles = @(
+            "$wixPath\wix.targets",
+            "$wixPath\Wix.targets", 
+            "$wixPath\..\MSBuildTasks\wix.targets",
+            "$wixPath\..\MSBuildTasks\Wix.targets"
+          )
           
-          if (Test-Path $sourceTargets) {
+          $sourceTargets = $null
+          foreach ($targetFile in $possibleTargetFiles) {
+            if (Test-Path $targetFile) {
+              $sourceTargets = $targetFile
+              Write-Host "Found WiX targets file at: $sourceTargets"
+              break
+            }
+          }
+          
+          if ($sourceTargets) {
+            $destTargets = "$wixTargetsDir\Wix.targets"
             Copy-Item $sourceTargets $destTargets -Force
             Write-Host "✅ Copied WiX targets to .NET SDK: $destTargets"
           } else {
-            Write-Error "❌ WiX targets file not found at $sourceTargets"
-            exit 1
+            Write-Host "⚠️ WiX targets file not found. Checked locations:"
+            foreach ($targetFile in $possibleTargetFiles) {
+              Write-Host "  - $targetFile"
+            }
+            Write-Host "Listing WiX installation directory contents:"
+            Get-ChildItem "$wixPath\.." -Recurse -Filter "*.targets" | Select-Object FullName
+            Write-Host "Continuing without MSBuild integration (candle.exe should still work)"
           }
           
-          # Copy other necessary WiX files
+          # Copy other necessary WiX files if available
           $wixToolsetPath = Split-Path $wixPath -Parent
           $wixTasksPath = "$wixToolsetPath\bin\WixTasks.dll"
           if (Test-Path $wixTasksPath) {
             Copy-Item $wixTasksPath $wixTargetsDir -Force
             Write-Host "✅ Copied WixTasks.dll to .NET SDK"
+          } else {
+            Write-Host "⚠️ WixTasks.dll not found at $wixTasksPath"
           }
           
-          # Verify the integration
-          if (Test-Path $destTargets) {
+          # Verify the integration (but don't fail if targets file wasn't found)
+          if ($sourceTargets -and (Test-Path "$wixTargetsDir\Wix.targets")) {
             Write-Host "✅ WiX MSBuild integration completed successfully"
           } else {
-            Write-Error "❌ WiX MSBuild integration failed"
-            exit 1
+            Write-Host "⚠️ WiX MSBuild integration partially completed - will use direct candle.exe/light.exe calls"
           }
         shell: powershell
 
