@@ -1,0 +1,257 @@
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release (e.g., v1.0.0)'
+        required: true
+        type: string
+
+jobs:
+  build-docker:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Extract version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "VERSION=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+          else
+            echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Build Docker image
+        run: |
+          docker build -t copypasta:${{ steps.version.outputs.VERSION }} .
+          docker save copypasta:${{ steps.version.outputs.VERSION }} | gzip > copypasta-docker-${{ steps.version.outputs.VERSION }}.tar.gz
+
+      - name: Upload Docker artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: copypasta-docker
+          path: copypasta-docker-${{ steps.version.outputs.VERSION }}.tar.gz
+
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '6.0.x'
+
+      - name: Setup WiX Toolset
+        run: |
+          # Download and install WiX Toolset v3.11
+          Invoke-WebRequest -Uri "https://github.com/wixtoolset/wix3/releases/download/wix3111rtm/wix311.exe" -OutFile "wix311.exe"
+          Start-Process -FilePath "wix311.exe" -ArgumentList "/S" -Wait
+          # Add WiX to PATH
+          $env:PATH += ";C:\Program Files (x86)\WiX Toolset v3.11\bin"
+          echo "C:\Program Files (x86)\WiX Toolset v3.11\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+        shell: powershell
+
+      - name: Extract version
+        id: version
+        run: |
+          if ("${{ github.event_name }}" -eq "workflow_dispatch") {
+            $version = "${{ github.event.inputs.version }}"
+          } else {
+            $version = "${{ github.ref }}" -replace "refs/tags/", ""
+          }
+          echo "VERSION=$version" >> $env:GITHUB_OUTPUT
+          
+          # Extract numeric version (remove 'v' prefix if present)
+          $numericVersion = $version -replace "^v", ""
+          echo "NUMERIC_VERSION=$numericVersion" >> $env:GITHUB_OUTPUT
+        shell: powershell
+
+      - name: Restore dependencies
+        run: dotnet restore win-copypasta/CopyPasta.sln
+
+      - name: Update version in project files
+        run: |
+          # Update version in .csproj
+          $csprojPath = "win-copypasta/CopyPasta.csproj"
+          $content = Get-Content $csprojPath -Raw
+          $content = $content -replace "<AssemblyVersion>.*</AssemblyVersion>", "<AssemblyVersion>${{ steps.version.outputs.NUMERIC_VERSION }}</AssemblyVersion>"
+          $content = $content -replace "<FileVersion>.*</FileVersion>", "<FileVersion>${{ steps.version.outputs.NUMERIC_VERSION }}</FileVersion>"
+          Set-Content $csprojPath $content
+          
+          # Update version in WiX project
+          $wixPath = "win-copypasta/CopyPasta.Installer/Product.wxs"
+          $content = Get-Content $wixPath -Raw
+          $content = $content -replace 'Version="[^"]*"', 'Version="${{ steps.version.outputs.NUMERIC_VERSION }}"'
+          Set-Content $wixPath $content
+        shell: powershell
+
+      - name: Build application
+        run: dotnet build win-copypasta/CopyPasta.csproj --configuration Release --no-restore
+
+      - name: Build installer
+        run: |
+          # Set environment variables for WiX
+          $env:WixTargetsPath = "C:\Program Files (x86)\WiX Toolset v3.11\bin\wix.targets"
+          
+          # Build the installer
+          msbuild win-copypasta/CopyPasta.Installer/CopyPasta.Installer.wixproj /p:Configuration=Release /p:Platform=x86
+        shell: powershell
+
+      - name: Sign installer (if certificate available)
+        if: env.SIGNING_CERT != ''
+        run: |
+          # This would sign the installer if a certificate is available
+          # signtool sign /f certificate.p12 /p password /t http://timestamp.sectigo.com win-copypasta/CopyPasta.Installer/bin/Release/CopyPasta-Setup.msi
+          echo "Code signing certificate not configured"
+        env:
+          SIGNING_CERT: ${{ secrets.SIGNING_CERT }}
+        shell: powershell
+
+      - name: Rename installer
+        run: |
+          $version = "${{ steps.version.outputs.VERSION }}"
+          Move-Item "win-copypasta/CopyPasta.Installer/bin/Release/CopyPasta-Setup.msi" "CopyPasta-Setup-$version.msi"
+        shell: powershell
+
+      - name: Upload Windows installer artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: copypasta-windows-installer
+          path: CopyPasta-Setup-${{ steps.version.outputs.VERSION }}.msi
+
+      - name: Build portable executable
+        run: |
+          dotnet publish win-copypasta/CopyPasta.csproj --configuration Release --runtime win-x64 --self-contained true -p:PublishSingleFile=true --output portable/
+          Compress-Archive -Path portable/CopyPasta.exe -DestinationPath CopyPasta-Portable-${{ steps.version.outputs.VERSION }}.zip
+        shell: powershell
+
+      - name: Upload portable artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: copypasta-windows-portable
+          path: CopyPasta-Portable-${{ steps.version.outputs.VERSION }}.zip
+
+  create-release:
+    needs: [build-docker, build-windows]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Extract version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "VERSION=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+          else
+            echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts/
+
+      - name: Generate release notes
+        id: release_notes
+        run: |
+          cat > release_notes.md << 'EOF'
+          # CopyPasta ${{ steps.version.outputs.VERSION }}
+          
+          ## What's New
+          
+          Cross-device clipboard sharing with automatic content detection and rich text support.
+          
+          ## Downloads
+          
+          ### Windows
+          - **CopyPasta-Setup-${{ steps.version.outputs.VERSION }}.msi** - Windows installer (recommended)
+          - **CopyPasta-Portable-${{ steps.version.outputs.VERSION }}.zip** - Portable executable
+          
+          ### Docker
+          - **copypasta-docker-${{ steps.version.outputs.VERSION }}.tar.gz** - Docker image
+          
+          ## Features
+          
+          - 🖥️ **Windows Tray Application**: Automatic clipboard monitoring and sync
+          - 🌐 **Web Interface**: Access clipboard from any device with a web browser
+          - 📝 **Rich Text Support**: Preserves formatting in copied text
+          - 🖼️ **Image Support**: Copy and paste images across devices
+          - 🔒 **Authentication**: Secure login system
+          - 🐳 **Docker Deployment**: Easy server setup with Docker
+          
+          ## Installation
+          
+          ### Windows Client
+          1. Download and run `CopyPasta-Setup-${{ steps.version.outputs.VERSION }}.msi`
+          2. Configure server endpoint and credentials
+          3. Start copying content between devices!
+          
+          ### Server (Docker)
+          ```bash
+          # Load the Docker image
+          gunzip -c copypasta-docker-${{ steps.version.outputs.VERSION }}.tar.gz | docker load
+          
+          # Run the container
+          docker run -d -p 5000:5000 --name copypasta copypasta:${{ steps.version.outputs.VERSION }}
+          ```
+          
+          ## System Requirements
+          
+          - **Windows Client**: Windows 10 or later, .NET 6.0 Runtime
+          - **Server**: Docker or Python 3.11+
+          
+          EOF
+
+      - name: Create GitHub Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ steps.version.outputs.VERSION }}
+          release_name: CopyPasta ${{ steps.version.outputs.VERSION }}
+          body_path: release_notes.md
+          draft: false
+          prerelease: false
+
+      - name: Upload Windows Installer
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: artifacts/copypasta-windows-installer/CopyPasta-Setup-${{ steps.version.outputs.VERSION }}.msi
+          asset_name: CopyPasta-Setup-${{ steps.version.outputs.VERSION }}.msi
+          asset_content_type: application/x-msi
+
+      - name: Upload Windows Portable
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: artifacts/copypasta-windows-portable/CopyPasta-Portable-${{ steps.version.outputs.VERSION }}.zip
+          asset_name: CopyPasta-Portable-${{ steps.version.outputs.VERSION }}.zip
+          asset_content_type: application/zip
+
+      - name: Upload Docker Image
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: artifacts/copypasta-docker/copypasta-docker-${{ steps.version.outputs.VERSION }}.tar.gz
+          asset_name: copypasta-docker-${{ steps.version.outputs.VERSION }}.tar.gz
+          asset_content_type: application/gzip

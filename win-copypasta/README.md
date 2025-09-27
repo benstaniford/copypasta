@@ -19,20 +19,40 @@ A Windows system tray application that automatically syncs your clipboard with t
 
 ## Installation
 
-1. **Build from Source**:
+### Option 1: Install from Release (Recommended)
+1. Download `CopyPasta-Setup-vX.X.X.msi` from the [latest release](https://github.com/anthropics/copypasta/releases)
+2. Run the installer as Administrator
+3. The application will be installed and available in Start Menu
+4. Right-click the system tray icon to configure settings
+
+### Option 2: Portable Version
+1. Download `CopyPasta-Portable-vX.X.X.zip` from the [latest release](https://github.com/anthropics/copypasta/releases)
+2. Extract the ZIP file to any folder
+3. Run `CopyPasta.exe`
+
+### Option 3: Build from Source
+1. **Prerequisites**:
+   - .NET 6.0 SDK
+   - WiX Toolset v3.11 (for building installer)
+
+2. **Build Application**:
    ```bash
    cd win-copypasta
    dotnet build --configuration Release
    ```
 
-2. **Run the Application**:
+3. **Build Installer**:
    ```bash
-   dotnet run
+   # Using PowerShell (recommended)
+   .\build-installer.ps1 -Version "1.0.0"
+   
+   # Using Command Prompt
+   build-installer.bat -version 1.0.0
    ```
 
-   Or after building:
+4. **Run the Application**:
    ```bash
-   ./bin/Release/net6.0-windows/CopyPasta.exe
+   dotnet run
    ```
 
 ## Configuration
