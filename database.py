@@ -11,9 +11,12 @@ DATABASE_PATH = os.path.join(os.path.dirname(__file__), 'clipboard.db')
 _clipboard_version = 0
 _clipboard_lock = threading.Lock()
 _clipboard_changed_condition = threading.Condition(_clipboard_lock)
+_version_initialized = False
 
 def init_db():
     """Initialize the database with required tables"""
+    global _clipboard_version, _version_initialized
+    
     conn = sqlite3.connect(DATABASE_PATH)
     cursor = conn.cursor()
     
@@ -39,6 +42,15 @@ def init_db():
         cursor.execute('ALTER TABLE clipboard_entries ADD COLUMN client_id TEXT')
     except sqlite3.OperationalError:
         pass  # Column already exists
+    
+    # Initialize global version counter from database
+    if not _version_initialized:
+        with _clipboard_lock:
+            cursor.execute('SELECT MAX(version) FROM clipboard_entries')
+            max_version = cursor.fetchone()[0]
+            if max_version is not None:
+                _clipboard_version = max_version
+            _version_initialized = True
     
     conn.commit()
     conn.close()
