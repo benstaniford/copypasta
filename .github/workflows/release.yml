@@ -241,6 +241,20 @@ jobs:
           msbuild win-copypasta/CopyPasta.Installer/CopyPasta.Installer.wixproj /p:Configuration=Release /p:Platform=x86 /p:WixTargetsPath="$wixTargetsPath" /verbosity:minimal
         shell: powershell
 
+      - name: Verify MSI exists
+        run: |
+          $msiPath = "win-copypasta/CopyPasta.Installer/bin/Release/CopyPasta-Setup.msi"
+          if (Test-Path $msiPath) {
+            Write-Host "✓ MSI file found: $msiPath"
+            $size = (Get-Item $msiPath).Length
+            Write-Host "✓ MSI size: $([math]::Round($size / 1MB, 2)) MB"
+          } else {
+            Write-Host "✗ MSI file not found: $msiPath"
+            Get-ChildItem win-copypasta/CopyPasta.Installer/bin -Recurse
+            exit 1
+          }
+        shell: powershell
+
       - name: Sign installer (if certificate available)
         if: env.SIGNING_CERT != ''
         run: |
@@ -254,7 +268,10 @@ jobs:
       - name: Rename installer
         run: |
           $version = "${{ steps.version.outputs.VERSION }}"
-          Move-Item "win-copypasta/CopyPasta.Installer/bin/Release/CopyPasta-Setup.msi" "CopyPasta-Setup-$version.msi"
+          $sourcePath = "win-copypasta/CopyPasta.Installer/bin/Release/CopyPasta-Setup.msi"
+          $targetPath = "CopyPasta-Setup-$version.msi"
+          Move-Item $sourcePath $targetPath
+          Write-Host "✓ Installer renamed to: $targetPath"
         shell: powershell
 
       - name: Upload Windows installer artifact
