@@ -131,7 +131,8 @@ jobs:
 
       - name: Restore dependencies
         run: |
-          dotnet restore win-copypasta/CopyPasta.sln
+          # Only restore the main C# project, not the WiX project
+          dotnet restore win-copypasta/CopyPasta.csproj
           
           # Also try to restore NuGet packages for WiX if available
           if (Test-Path "win-copypasta/CopyPasta.Installer/packages.config") {
