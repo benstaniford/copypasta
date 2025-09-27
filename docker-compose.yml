@@ -1,6 +1,6 @@
 services:
   copypasta:
-    build: .
+    image: nerwander/copypasta:latest
     container_name: copypasta
     ports:
       - "5000:5000"

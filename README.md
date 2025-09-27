@@ -21,6 +21,14 @@ A cross-device clipboard sharing application built with Flask. Share text and im
 
 ### Using Docker (Recommended)
 
+**Option 1: Using Docker Hub (Easiest)**
+```bash
+# Download and start with docker-compose
+curl -O https://raw.githubusercontent.com/anthropics/copypasta/main/docker-compose.yml
+docker compose up -d
+```
+
+**Option 2: Build from Source**
 1. **Clone the repository**
    ```bash
    git clone <your-repo-url>

@@ -10,6 +10,9 @@ This is CopyPasta, a cross-device clipboard sharing application built with Flask
 
 ### Building and Running
 ```bash
+# Quick start using Docker Hub image
+docker compose up -d
+
 # Build and run locally (development)
 docker compose up --build -d
 
