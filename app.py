@@ -95,8 +95,8 @@ def paste():
                 return jsonify({'error': 'Rich content cannot be empty'}), 400
             
             # Basic validation - ensure it's not too large
-            if len(content) > 1000000:  # 1MB limit for rich content
-                return jsonify({'error': 'Rich content too large (max 1MB)'}), 400
+            if len(content) > 10000000:  # 10MB limit for rich content
+                return jsonify({'error': 'Rich content too large (max 10MB)'}), 400
         
         # Save to database
         metadata = {
