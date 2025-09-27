@@ -140,9 +140,9 @@ class CopyPastaClient:
             
             if response.status_code == 200:
                 data = response.json()
-                if data and 'content' in data:
+                if data and data.get('data') and 'content' in data['data']:
                     # Only print the content, not the metadata
-                    print(data['content'], end='')
+                    print(data['data']['content'], end='')
                     return True
                 else:
                     print("No content in clipboard", file=sys.stderr)
