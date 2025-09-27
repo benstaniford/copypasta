@@ -269,20 +269,23 @@ jobs:
         try {
           $existingRelease = gh release view $tag 2>$null
           if ($existingRelease) {
-            Write-Host "Release $tag already exists, deleting it first..."
-            gh release delete $tag --yes --cleanup-tag
-            Start-Sleep -Seconds 2
+            Write-Host "Release $tag already exists, will add artifacts to it..."
+          } else {
+            # Create the release
+            Write-Host "Creating GitHub release..."
+            gh release create $tag `
+              --title "CopyPasta v$version" `
+              --notes-file "release-notes.md" `
+              --latest
           }
         } catch {
-          Write-Host "No existing release found (this is normal)"
+          Write-Host "No existing release found, creating new release..."
+          # Create the release
+          gh release create $tag `
+            --title "CopyPasta v$version" `
+            --notes-file "release-notes.md" `
+            --latest
         }
-        
-        # Create the release
-        Write-Host "Creating GitHub release..."
-        gh release create $tag `
-          --title "CopyPasta v$version" `
-          --notes-file "release-notes.md" `
-          --latest
         
         Write-Host "✓ GitHub release created successfully"
 

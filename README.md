@@ -1,251 +1,122 @@
 # CopyPasta 📋
 
-A cross-device clipboard sharing application built with Flask. Share text and images seamlessly between your devices through a simple web interface.
-
-## ✨ Features
-
-- **Cross-Device Clipboard**: Share content between phones, tablets, computers, and any device with a web browser
-- **Multi-Content Support**: Text, rich text, and images (PNG, JPG, GIF, etc.)
-- **Real-Time Sync**: Auto-refresh every 10 seconds to keep all devices in sync
-- **One-Click Copy**: Copy shared content directly to your device's clipboard
-- **Persistent Login**: Stay logged in until you explicitly sign out
-- **Secure Storage**: SQLite database with metadata tracking
-- **Production Ready**: Docker deployment with Gunicorn WSGI server
-- **Mobile Friendly**: Responsive design works on all screen sizes
+Cross-device clipboard sharing through a web interface. Share text and images between your devices instantly.  A docker container maintains the clipboard history and your devices can access it via the web or via native clients that watch system clipboards.
 
 ## 🚀 Quick Start
 
-### Prerequisites
-- Docker and Docker Compose
-- Any modern web browser
+### Docker (Recommended)
 
-### Using Docker (Recommended)
+1. **Download and run:**
+   ```bash
+   docker run -d -p 5000:5000 --name copypasta nerwander/copypasta:latest
+   ```
 
-**Option 1: Using Docker Hub (Easiest)**
-```bash
-# Download and start with docker-compose
-curl -O https://raw.githubusercontent.com/anthropics/copypasta/main/docker-compose.yml
-docker compose up -d
+2. **Or use docker-compose:**
+   ```bash
+   curl -O https://raw.githubusercontent.com/your-repo/copypasta/main/docker-compose.yml
+   docker compose up -d
+   ```
+
+3. **Access:** Open `http://localhost:5000` and login with `user` / `password`
+
+### Docker Compose File
+
+```yaml
+services:
+  copypasta:
+    image: nerwander/copypasta:latest
+    container_name: copypasta
+    ports:
+      - "5000:5000"
+    restart: unless-stopped
+    environment:
+      - FLASK_ENV=production
+      - APP_USERNAME=user
+      - APP_PASSWORD=password
+      - SECRET_KEY=your-super-secret-key-change-this-in-production
+    healthcheck:
+      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:5000/health', timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
 ```
 
-**Option 2: Build from Source**
-1. **Clone the repository**
-   ```bash
-   git clone <your-repo-url>
-   cd copypasta
-   ```
+## 📱 Client Applications
 
-2. **Start the application**
-   ```bash
-   docker compose up --build -d
-   ```
+- **Web Interface** - Works on any device with a browser
+- **Linux CLI** - Command-line tool for Linux systems
+- **Windows Client** - Native Windows application
 
-3. **Access the application**
-   - Open your browser to `http://localhost:5000`
-   - Login with default credentials: `user` / `password`
-   - Start sharing content between your devices!
+Check the [Releases page](https://github.com/your-repo/copypasta/releases) for the latest client downloads.
 
-### Local Development
+### Linux CLI Installation
 
-1. **Install dependencies**
-   ```bash
-   pip install -r requirements.txt
-   ```
+```bash
+# Download from releases page
+sudo dpkg -i copyp_*.deb
+sudo apt-get install -f
 
-2. **Run the application**
-   ```bash
-   python app.py
-   ```
+# Configure and use
+copyp  # First run prompts for server URL and credentials
+echo "Hello World" | copyp  # Copy text
+copyp  # Paste text
+```
 
 ## 📱 How to Use
 
-1. **Login** on any device using your credentials
-2. **Paste Content**: 
-   - Type or paste text in the text area
-   - OR upload an image using the file picker
-   - Click "Save to Clipboard"
-3. **Copy on Another Device**:
-   - Open CopyPasta on any other device
-   - View the preview of your shared content
-   - Click "Copy to Device" for text content
-   - Right-click and save images
+1. **Web Interface:**
+   - Login on any device
+   - Paste content in the text area or upload images
+   - Content appears instantly on all logged-in devices
+   - Click "Copy to Device" to copy text to your clipboard
+
+2. **Cross-Device Access:**
+   - Replace `localhost` with your computer's IP address
+   - Example: `http://192.168.1.100:5000`
+   - Ensure port 5000 is accessible on your network
 
 ## ⚙️ Configuration
 
-Configure the application using environment variables:
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `APP_USERNAME` | `user` | Authentication username |
-| `APP_PASSWORD` | `password` | Authentication password |
-| `SECRET_KEY` | `your-secret-key-change-this-in-production` | Flask session secret |
-
-### Docker Compose Configuration
+Change default credentials for security:
 
 ```yaml
 environment:
-  - APP_USERNAME=myuser
-  - APP_PASSWORD=mypassword
-  - SECRET_KEY=your-very-secure-secret-key
+  - APP_USERNAME=your-username
+  - APP_PASSWORD=your-secure-password
+  - SECRET_KEY=your-very-long-random-secret-key
 ```
 
-## 🔧 API Endpoints
+## ✨ Features
 
-### Web Interface
-- `GET /` - Main clipboard interface (requires authentication)
-- `GET /login` - Login page
-- `POST /login` - Authentication endpoint
-- `GET /logout` - Logout endpoint
+- **Real-time sync** across all devices
+- **Text and image support** (PNG, JPG, GIF)
+- **Persistent login** until logout
+- **Mobile-friendly** responsive design
+- **Secure authentication** with configurable credentials
+- **Docker deployment** for easy setup
 
-### API Endpoints
-- `GET /health` - Health check endpoint
-- `GET /api/clipboard` - Get current clipboard content
-- `POST /api/paste` - Save new content to clipboard
-- `GET /api/data` - Legacy API endpoint for compatibility
+## 🔒 Security Notes
 
-### API Usage Examples
-
-**Get clipboard content:**
-```bash
-curl -H "Cookie: session=..." http://localhost:5000/api/clipboard
-```
-
-**Save text content:**
-```bash
-curl -X POST \
-  -H "Content-Type: application/json" \
-  -H "Cookie: session=..." \
-  -d '{"type":"text","content":"Hello from API!"}' \
-  http://localhost:5000/api/paste
-```
-
-## 🐳 Docker Details
-
-### Multi-Stage Build
-- **Builder stage**: Compiles Python packages including Pillow for image processing
-- **Runtime stage**: Minimal production image with SQLite database
-- **Base**: Python 3.11 slim for security and size optimization
-
-### Persistent Data
-- SQLite database stored in container at `/app/clipboard.db`
-- Mount a volume to persist data across container restarts:
-  ```yaml
-  volumes:
-    - ./data:/app/data
-  ```
-
-## 🧪 Testing
-
-### Run All Tests
-```bash
-./scripts/test-all
-```
-
-### Individual Test Components
-```bash
-# Python unit tests
-python -m pytest tests/ -v
-
-# Import verification
-python tests/test_imports.py
-
-# Docker container tests
-./test-docker/test-container.sh
-```
-
-## 📁 Project Structure
-
-```
-├── app.py                 # Main Flask application
-├── database.py           # SQLite database operations
-├── requirements.txt       # Python dependencies (Flask, Pillow, etc.)
-├── Dockerfile            # Multi-stage Docker build
-├── docker-compose.yml    # Development compose file
-├── gunicorn.conf.py      # Production server configuration
-├── templates/            # HTML templates
-│   ├── index.html       # Main clipboard interface
-│   └── login.html       # Login page
-├── tests/               # Test suite
-├── scripts/             # Automation scripts
-├── test-docker/         # Container testing
-└── clipboard.db         # SQLite database (created at runtime)
-```
-
-## 🚀 Deployment
-
-### Production Deployment
-1. **Set secure credentials**
-   ```bash
-   export APP_USERNAME="your-secure-username"
-   export APP_PASSWORD="your-secure-password"
-   export SECRET_KEY="your-very-long-random-secret-key"
-   ```
-
-2. **Deploy with Docker Compose**
-   ```bash
-   docker compose -f docker-compose.prod.yml up -d
-   ```
-
-3. **Configure reverse proxy** (nginx, traefik, etc.)
-4. **Set up SSL certificates** for HTTPS access
-
-### Network Access
-For cross-device access, ensure the application is accessible on your local network:
-```yaml
-ports:
-  - "0.0.0.0:5000:5000"  # Allow access from other devices
-```
-
-Then access from other devices using your computer's IP: `http://YOUR-IP:5000`
-
-## 🔒 Security Considerations
-
-- **Change default credentials** before exposing to network
-- **Use HTTPS** in production to protect login credentials
-- **Firewall access** if deploying on public networks
-- **Regular backups** of clipboard.db if storing important content
-- **Monitor access logs** for unauthorized usage
-
-## 💡 Use Cases
-
-- **Developer Workflow**: Share code snippets between development machine and testing devices
-- **Content Creation**: Move text drafts between phone and computer
-- **Image Sharing**: Quick photo sharing between devices without cloud services
-- **Meeting Notes**: Share meeting links or notes between laptop and phone
-- **Cross-Platform**: Bridge content between iOS, Android, Windows, Mac, Linux
+- **Change default credentials** before network access
+- **Use HTTPS** in production environments
+- **Firewall protection** for public deployments
 
 ## 🆘 Troubleshooting
 
-### Common Issues
-
 **Can't access from other devices:**
-- Check firewall settings
-- Ensure port 5000 is open
-- Use correct IP address (not localhost)
-
-**Images not displaying:**
-- Check image file size (large files may take time)
-- Ensure valid image format (PNG, JPG, GIF)
-- Check browser console for errors
+- Check firewall settings and port 5000 access
+- Use your computer's IP address, not `localhost`
 
 **Login issues:**
-- Verify credentials in environment variables
-- Clear browser cookies and try again
-- Check container logs: `docker compose logs flask-app`
+- Verify environment variables are set correctly
+- Clear browser cookies
 
-### Development
-
+**View logs:**
 ```bash
-# View application logs
-docker compose logs -f flask-app
-
-# Access container shell
-docker compose exec flask-app sh
-
-# Test database connection
-python -c "from database import get_clipboard_entry; print(get_clipboard_entry())"
+docker compose logs -f copypasta
 ```
 
 ## 📝 License
 
-This project is provided as-is for personal and educational use. Feel free to modify and adapt for your needs.
+MIT License - feel free to modify and adapt for your needs.
