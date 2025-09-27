@@ -162,27 +162,70 @@ jobs:
 
       - name: Build installer
         run: |
-          # Find WiX installation path
-          $wixTargetsPath = ""
-          if (Test-Path "C:\Program Files (x86)\WiX Toolset v3.14\bin\wix.targets") {
-            $wixTargetsPath = "C:\Program Files (x86)\WiX Toolset v3.14\bin\wix.targets"
-          } elseif (Test-Path "C:\Program Files\WiX Toolset v3.14\bin\wix.targets") {
-            $wixTargetsPath = "C:\Program Files\WiX Toolset v3.14\bin\wix.targets"
-          } elseif (Test-Path "C:\Program Files (x86)\WiX Toolset v3.11\bin\wix.targets") {
-            $wixTargetsPath = "C:\Program Files (x86)\WiX Toolset v3.11\bin\wix.targets"
+          # Find WiX installation directory
+          Write-Host "Searching for WiX installation..."
+          
+          $wixPaths = @(
+            "C:\Program Files (x86)\WiX Toolset v3.14",
+            "C:\Program Files\WiX Toolset v3.14", 
+            "C:\Program Files (x86)\WiX Toolset v3.11",
+            "C:\Program Files\WiX Toolset v3.11"
+          )
+          
+          $wixInstallPath = $null
+          foreach ($path in $wixPaths) {
+            if (Test-Path $path) {
+              $wixInstallPath = $path
+              Write-Host "✅ Found WiX at: $path"
+              break
+            }
+          }
+          
+          if (-not $wixInstallPath) {
+            Write-Host "❌ WiX not found in expected locations. Searching all Program Files..."
+            Get-ChildItem "C:\Program Files (x86)" | Where-Object { $_.Name -like "*WiX*" } | ForEach-Object { Write-Host "Found: $($_.FullName)" }
+            Get-ChildItem "C:\Program Files" | Where-Object { $_.Name -like "*WiX*" } | ForEach-Object { Write-Host "Found: $($_.FullName)" }
+            
+            # Try chocolatey install location
+            $chocoWixPath = "C:\ProgramData\chocolatey\lib\wixtoolset\tools"
+            if (Test-Path $chocoWixPath) {
+              $wixInstallPath = $chocoWixPath
+              Write-Host "✅ Found WiX via Chocolatey at: $chocoWixPath"
+            } else {
+              Write-Error "WiX Toolset installation not found"
+              exit 1
+            }
+          }
+          
+          # Set WiX environment variables
+          $wixBinPath = Join-Path $wixInstallPath "bin"
+          $env:WIX = $wixInstallPath
+          $env:PATH = "$wixBinPath;$env:PATH"
+          
+          Write-Host "WIX environment variable set to: $env:WIX"
+          Write-Host "WiX bin path added to PATH: $wixBinPath"
+          
+          # Verify WiX tools are available
+          $candlePath = Join-Path $wixBinPath "candle.exe"
+          $lightPath = Join-Path $wixBinPath "light.exe"
+          
+          if (Test-Path $candlePath) {
+            Write-Host "✅ candle.exe found at: $candlePath"
           } else {
-            Write-Error "WiX Toolset targets not found"
-            Write-Host "Searched paths:"
-            Write-Host "- C:\Program Files (x86)\WiX Toolset v3.14\bin\wix.targets"
-            Write-Host "- C:\Program Files\WiX Toolset v3.14\bin\wix.targets"
-            Write-Host "- C:\Program Files (x86)\WiX Toolset v3.11\bin\wix.targets"
+            Write-Error "candle.exe not found at: $candlePath"
             exit 1
           }
           
-          Write-Host "Using WiX targets at: $wixTargetsPath"
+          if (Test-Path $lightPath) {
+            Write-Host "✅ light.exe found at: $lightPath"
+          } else {
+            Write-Error "light.exe not found at: $lightPath"
+            exit 1
+          }
           
-          # Build the installer
-          msbuild win-copypasta/CopyPasta.Installer/CopyPasta.Installer.wixproj /p:Configuration=Release /p:Platform=x86 /p:WixTargetsPath="$wixTargetsPath" /verbosity:minimal
+          # Build the installer using MSBuild with WiX environment
+          Write-Host "Building WiX installer project..."
+          msbuild win-copypasta/CopyPasta.Installer/CopyPasta.Installer.wixproj /p:Configuration=Release /p:Platform=x86 /verbosity:minimal
         shell: powershell
 
       - name: Sign installer (if certificate available)
