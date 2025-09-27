@@ -142,7 +142,7 @@ jobs:
       run: nuget restore win-copypasta/CopyPasta.sln
 
     - name: Build C# Project (Release)
-      run: msbuild win-copypasta/CopyPasta.csproj /p:Configuration=Release /p:Platform="Any CPU"
+      run: msbuild win-copypasta/CopyPasta.csproj /p:Configuration=Release /p:Platform=x86
 
     # WiX Installer Build
     - name: Setup WiX Toolset
