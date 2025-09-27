@@ -52,6 +52,17 @@ jobs:
         with:
           dotnet-version: '6.0.x'
 
+      - name: Setup MSBuild
+        uses: microsoft/setup-msbuild@v1.3
+
+      - name: Verify MSBuild
+        run: |
+          Write-Host "MSBuild version:"
+          msbuild -version
+          Write-Host "MSBuild path:"
+          Get-Command msbuild | Select-Object -ExpandProperty Source
+        shell: powershell
+
       - name: Setup WiX Toolset
         run: |
           # Download and install WiX Toolset v3.11
@@ -100,13 +111,7 @@ jobs:
         run: dotnet build win-copypasta/CopyPasta.csproj --configuration Release --no-restore
 
       - name: Build installer
-        run: |
-          # Set environment variables for WiX
-          $env:WixTargetsPath = "C:\Program Files (x86)\WiX Toolset v3.11\bin\wix.targets"
-          
-          # Build the installer
-          msbuild win-copypasta/CopyPasta.Installer/CopyPasta.Installer.wixproj /p:Configuration=Release /p:Platform=x86
-        shell: powershell
+        run: msbuild win-copypasta/CopyPasta.Installer/CopyPasta.Installer.wixproj /p:Configuration=Release /p:Platform=x86 /p:WixTargetsPath="C:\Program Files (x86)\WiX Toolset v3.11\bin\wix.targets" /verbosity:minimal
 
       - name: Sign installer (if certificate available)
         if: env.SIGNING_CERT != ''
