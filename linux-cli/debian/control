@@ -1,12 +1,15 @@
-Package: copyp
-Version: 1.0.0
+Source: copyp
 Section: utils
 Priority: optional
-Architecture: all
-Depends: python3 (>= 3.8), python3-requests
 Maintainer: CopyPasta <noreply@copypasta.dev>
+Build-Depends: debhelper-compat (= 12), dh-python, python3-all, python3-setuptools
+Standards-Version: 4.5.0
+Homepage: https://github.com/your-repo/copypasta
+
+Package: copyp
+Architecture: all
+Depends: ${python3:Depends}, ${misc:Depends}, python3-requests
 Description: Command-line interface for CopyPasta clipboard sharing service
  CopyPasta CLI allows you to share clipboard content between devices
  through a web service. It automatically detects copy (stdin) vs paste
  (stdout) mode and manages configuration in ~/.config/copyp.rc.
-Homepage: https://github.com/your-repo/copypasta
