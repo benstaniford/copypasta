@@ -9,6 +9,9 @@ __pycache__/
 # Vscode
 .vscode
 
+# SQL lite db
+clipboard.db
+
 # Distribution / packaging
 .Python
 build/
