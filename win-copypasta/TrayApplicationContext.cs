@@ -7,10 +7,10 @@ namespace CopyPasta
 {
     public class TrayApplicationContext : ApplicationContext
     {
-        private NotifyIcon _trayIcon;
-        private ClipboardMonitor _clipboardMonitor;
-        private CopyPastaClient _client;
-        private Settings _settings;
+        private NotifyIcon _trayIcon = null!;
+        private ClipboardMonitor _clipboardMonitor = null!;
+        private CopyPastaClient _client = null!;
+        private Settings _settings = null!;
 
         public TrayApplicationContext()
         {

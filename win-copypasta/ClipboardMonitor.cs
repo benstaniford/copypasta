@@ -38,9 +38,8 @@ namespace CopyPasta
         [DllImport("user32.dll", SetLastError = true)]
         private static extern bool RemoveClipboardFormatListener(IntPtr hwnd);
 
-        private ClipboardForm _clipboardForm;
+        private ClipboardForm _clipboardForm = null!;
         private string _lastClipboardContent = "";
-        private ClipboardContentType _lastContentType = ClipboardContentType.Text;
 
         public event EventHandler<ClipboardChangedEventArgs>? ClipboardChanged;
 
@@ -71,7 +70,6 @@ namespace CopyPasta
                         if (!string.IsNullOrEmpty(base64Image) && base64Image != _lastClipboardContent)
                         {
                             _lastClipboardContent = base64Image;
-                            _lastContentType = ClipboardContentType.Image;
                             ClipboardChanged?.Invoke(this, new ClipboardChangedEventArgs(base64Image, ClipboardContentType.Image));
                         }
                     }
@@ -85,7 +83,6 @@ namespace CopyPasta
                     if (!string.IsNullOrEmpty(htmlContent) && htmlContent != _lastClipboardContent)
                     {
                         _lastClipboardContent = htmlContent;
-                        _lastContentType = ClipboardContentType.RichText;
                         ClipboardChanged?.Invoke(this, new ClipboardChangedEventArgs(htmlContent, ClipboardContentType.RichText));
                     }
                 }
@@ -96,7 +93,6 @@ namespace CopyPasta
                     if (!string.IsNullOrEmpty(textContent) && textContent != _lastClipboardContent)
                     {
                         _lastClipboardContent = textContent;
-                        _lastContentType = ClipboardContentType.Text;
                         ClipboardChanged?.Invoke(this, new ClipboardChangedEventArgs(textContent, ClipboardContentType.Text));
                     }
                 }

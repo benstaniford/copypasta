@@ -7,17 +7,17 @@ namespace CopyPasta
     public partial class SettingsForm : Form
     {
         private Settings _settings;
-        private Label _endpointLabel;
-        private TextBox _endpointTextBox;
-        private Label _usernameLabel;
-        private TextBox _usernameTextBox;
-        private Label _passwordLabel;
-        private TextBox _passwordTextBox;
-        private CheckBox _autoStartCheckBox;
-        private Button _testConnectionButton;
-        private Button _okButton;
-        private Button _cancelButton;
-        private Label _statusLabel;
+        private Label _endpointLabel = null!;
+        private TextBox _endpointTextBox = null!;
+        private Label _usernameLabel = null!;
+        private TextBox _usernameTextBox = null!;
+        private Label _passwordLabel = null!;
+        private TextBox _passwordTextBox = null!;
+        private CheckBox _autoStartCheckBox = null!;
+        private Button _testConnectionButton = null!;
+        private Button _okButton = null!;
+        private Button _cancelButton = null!;
+        private Label _statusLabel = null!;
 
         public SettingsForm(Settings settings)
         {
