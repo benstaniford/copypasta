@@ -200,7 +200,7 @@ namespace CopyPasta
                 
                 if (result?.Data != null)
                 {
-                    _lastKnownVersion = result.Data.Version;
+                    // Don't update version here - GetClipboardContent is for immediate checks, not polling
                     Logger.LogNetwork("Poll", url, "Success", $"New content found, Version: {result.Data.Version}");
                     return result.Data;
                 }
@@ -263,9 +263,14 @@ namespace CopyPasta
                         var content = await response.Content.ReadAsStringAsync();
                         var result = JsonConvert.DeserializeObject<PollResponse>(content);
 
-                        if (result?.Status == "success" && result.Data != null)
+                        // Always update version first, regardless of result type
+                        if (result?.Version > 0)
                         {
                             _lastKnownVersion = result.Version;
+                        }
+                        
+                        if (result?.Status == "success" && result.Data != null)
+                        {
                             Logger.LogNetwork("LongPoll", url, "NewData", $"Version: {result.Version}, Type: {result.Data.ContentType}");
                             
                             var contentType = result.Data.ContentType switch
@@ -284,7 +289,6 @@ namespace CopyPasta
                         }
                         else if (result?.Status == "timeout")
                         {
-                            _lastKnownVersion = result.Version;
                             Logger.LogNetwork("LongPoll", url, "Timeout", $"Version: {result.Version}");
                         }
                     }

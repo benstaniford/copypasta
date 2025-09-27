@@ -10,7 +10,7 @@ DATABASE_PATH = os.path.join(os.path.dirname(__file__), 'clipboard.db')
 # Global version counter and lock for clipboard changes
 _clipboard_version = 0
 _clipboard_lock = threading.Lock()
-_clipboard_changed_event = threading.Event()
+_clipboard_changed_condition = threading.Condition(_clipboard_lock)
 
 def init_db():
     """Initialize the database with required tables"""
@@ -28,6 +28,17 @@ def init_db():
             client_id TEXT
         )
     ''')
+    
+    # Migration: Add new columns if they don't exist
+    try:
+        cursor.execute('ALTER TABLE clipboard_entries ADD COLUMN version INTEGER DEFAULT 1')
+    except sqlite3.OperationalError:
+        pass  # Column already exists
+    
+    try:
+        cursor.execute('ALTER TABLE clipboard_entries ADD COLUMN client_id TEXT')
+    except sqlite3.OperationalError:
+        pass  # Column already exists
     
     conn.commit()
     conn.close()
@@ -62,8 +73,8 @@ def save_clipboard_entry(content_type, content, metadata=None, client_id=None):
     conn.close()
     
     # Notify waiting clients
-    _clipboard_changed_event.set()
-    _clipboard_changed_event.clear()
+    with _clipboard_changed_condition:
+        _clipboard_changed_condition.notify_all()
 
 def get_clipboard_entry():
     """Get the current clipboard entry"""
@@ -100,12 +111,23 @@ def wait_for_clipboard_change(last_version, timeout=30):
     """Wait for clipboard to change from last_version, with timeout"""
     start_time = time.time()
     
-    while time.time() - start_time < timeout:
-        current_version = get_clipboard_version()
-        if current_version > last_version:
-            return get_clipboard_entry()
-        
-        # Wait for notification or timeout
-        _clipboard_changed_event.wait(timeout=1)
+    with _clipboard_changed_condition:
+        while time.time() - start_time < timeout:
+            current_version = _clipboard_version
+            if current_version > last_version:
+                # Release lock before database access
+                _clipboard_changed_condition.release()
+                try:
+                    return get_clipboard_entry()
+                finally:
+                    _clipboard_changed_condition.acquire()
+            
+            # Calculate remaining timeout
+            remaining_timeout = timeout - (time.time() - start_time)
+            if remaining_timeout <= 0:
+                break
+                
+            # Wait for notification with remaining timeout
+            _clipboard_changed_condition.wait(timeout=min(remaining_timeout, 0.5))
         
     return None  # Timeout

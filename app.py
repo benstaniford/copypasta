@@ -178,17 +178,20 @@ def poll_clipboard():
         # Wait for change
         entry = wait_for_clipboard_change(last_version, timeout)
         
+        # Always get the latest version for consistent responses
+        final_version = get_clipboard_version()
+        
         if entry and should_send_to_client(entry):
             return jsonify({
                 'status': 'success',
                 'data': entry,
-                'version': entry.get('version', current_version)
+                'version': final_version
             })
         else:
             # Timeout or filtered out - return current state
             return jsonify({
                 'status': 'timeout',
-                'version': current_version,
+                'version': final_version,
                 'message': 'No changes within timeout period'
             })
             
