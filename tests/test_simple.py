@@ -31,7 +31,7 @@ class TestSimple(unittest.TestCase):
         """Test that login page loads correctly"""
         response = self.app.get('/login')
         self.assertEqual(response.status_code, 200)
-        self.assertIn(b'Flask App', response.data)
+        self.assertIn(b'CopyPasta', response.data)
         self.assertIn(b'username', response.data)
         self.assertIn(b'password', response.data)
     
