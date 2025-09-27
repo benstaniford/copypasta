@@ -86,53 +86,12 @@ jobs:
 
       - name: Setup WiX Toolset
         run: |
-          # Download and install WiX Toolset v3.14
-          Write-Host "Downloading WiX Toolset v3.14..."
-          Invoke-WebRequest -Uri "https://github.com/wixtoolset/wix3/releases/download/wix314-rtm/wix314.exe" -OutFile "wix314.exe"
-          
-          Write-Host "Installing WiX Toolset v3.14..."
-          Start-Process -FilePath "wix314.exe" -ArgumentList "/quiet" -Wait
-          
-          # Give it a moment to complete installation
-          Start-Sleep -Seconds 5
-          
-          # Check for both possible installation paths
-          $wixPath = ""
-          if (Test-Path "C:\Program Files (x86)\WiX Toolset v3.14\bin") {
-            $wixPath = "C:\Program Files (x86)\WiX Toolset v3.14\bin"
-            Write-Host "✅ WiX Toolset v3.14 installed successfully at $wixPath"
-          } elseif (Test-Path "C:\Program Files\WiX Toolset v3.14\bin") {
-            $wixPath = "C:\Program Files\WiX Toolset v3.14\bin"
-            Write-Host "✅ WiX Toolset v3.14 installed successfully at $wixPath"
-          } else {
-            Write-Host "❌ WiX Toolset installation failed. Checking available directories..."
-            Write-Host "Program Files (x86) contents:"
-            if (Test-Path "C:\Program Files (x86)") {
-              Get-ChildItem "C:\Program Files (x86)" | Where-Object { $_.Name -like "*WiX*" } | Select-Object Name
-            }
-            Write-Host "Program Files contents:"
-            if (Test-Path "C:\Program Files") {
-              Get-ChildItem "C:\Program Files" | Where-Object { $_.Name -like "*WiX*" } | Select-Object Name
-            }
-            exit 1
-          }
-          
-          # Show what's in the bin directory
-          Write-Host "WiX bin directory contents:"
-          Get-ChildItem $wixPath | Select-Object Name | Format-Table
-          
-          # Add WiX to PATH
-          $env:PATH += ";$wixPath"
-          echo $wixPath | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
-          
-          # Verify candle.exe is available
-          Write-Host "Verifying candle.exe..."
-          if (Test-Path "$wixPath\candle.exe") {
-            Write-Host "✅ candle.exe found at $wixPath\candle.exe"
-          } else {
-            Write-Error "❌ candle.exe not found at $wixPath\candle.exe"
-            exit 1
-          }
+          Write-Host "Installing WiX Toolset..."
+          choco install wixtoolset -y --no-progress
+          Write-Host "Refreshing environment..."
+          # Add WiX to PATH for this session
+          $env:PATH += ";C:\Program Files (x86)\WiX Toolset v3.11\bin"
+          echo "PATH=$env:PATH" >> $env:GITHUB_ENV
         shell: powershell
 
       - name: Extract version
@@ -180,29 +139,24 @@ jobs:
       - name: Build application
         run: dotnet build win-copypasta/CopyPasta.csproj --configuration Release --no-restore
 
-      - name: Build installer
+      - name: Build WiX Installer
         run: |
-          # Find WiX installation path
-          $wixTargetsPath = ""
-          if (Test-Path "C:\Program Files (x86)\WiX Toolset v3.14\bin\wix.targets") {
-            $wixTargetsPath = "C:\Program Files (x86)\WiX Toolset v3.14\bin\wix.targets"
-          } elseif (Test-Path "C:\Program Files\WiX Toolset v3.14\bin\wix.targets") {
-            $wixTargetsPath = "C:\Program Files\WiX Toolset v3.14\bin\wix.targets"
-          } elseif (Test-Path "C:\Program Files (x86)\WiX Toolset v3.11\bin\wix.targets") {
-            $wixTargetsPath = "C:\Program Files (x86)\WiX Toolset v3.11\bin\wix.targets"
+          $env:PATH += ";C:\Program Files (x86)\WiX Toolset v3.11\bin"
+          msbuild win-copypasta/CopyPasta.Installer/CopyPasta.Installer.wixproj /p:Configuration=Release /p:Platform=x86
+        shell: powershell
+
+      - name: Verify MSI exists
+        run: |
+          $msiPath = "win-copypasta/CopyPasta.Installer/bin/Release/CopyPasta-Setup.msi"
+          if (Test-Path $msiPath) {
+            Write-Host "✓ MSI file found: $msiPath"
+            $size = (Get-Item $msiPath).Length
+            Write-Host "✓ MSI size: $([math]::Round($size / 1MB, 2)) MB"
           } else {
-            Write-Error "WiX Toolset targets not found"
-            Write-Host "Searched paths:"
-            Write-Host "- C:\Program Files (x86)\WiX Toolset v3.14\bin\wix.targets"
-            Write-Host "- C:\Program Files\WiX Toolset v3.14\bin\wix.targets"
-            Write-Host "- C:\Program Files (x86)\WiX Toolset v3.11\bin\wix.targets"
+            Write-Host "✗ MSI file not found: $msiPath"
+            Get-ChildItem win-copypasta/CopyPasta.Installer/bin -Recurse
             exit 1
           }
-          
-          Write-Host "Using WiX targets at: $wixTargetsPath"
-          
-          # Build the installer
-          msbuild win-copypasta/CopyPasta.Installer/CopyPasta.Installer.wixproj /p:Configuration=Release /p:Platform=x86 /p:WixTargetsPath="$wixTargetsPath" /verbosity:minimal
         shell: powershell
 
       - name: Sign installer (if certificate available)
@@ -218,7 +172,10 @@ jobs:
       - name: Rename installer
         run: |
           $version = "${{ steps.version.outputs.VERSION }}"
-          Move-Item "win-copypasta/CopyPasta.Installer/bin/Release/CopyPasta-Setup.msi" "CopyPasta-Setup-$version.msi"
+          $sourcePath = "win-copypasta/CopyPasta.Installer/bin/Release/CopyPasta-Setup.msi"
+          $targetPath = "CopyPasta-Setup-$version.msi"
+          Move-Item $sourcePath $targetPath
+          Write-Host "✓ Installer renamed to: $targetPath"
         shell: powershell
 
       - name: Upload Windows installer artifact
