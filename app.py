@@ -3,7 +3,7 @@ import os
 from functools import wraps
 import base64
 from datetime import datetime, timedelta
-from database import init_db, save_clipboard_entry, get_clipboard_entry
+from database import init_db, save_clipboard_entry, get_clipboard_entry, get_clipboard_version, wait_for_clipboard_change
 from PIL import Image
 import io
 
@@ -143,6 +143,48 @@ def api_data():
         'message': 'CopyPasta API is running!',
         'status': 'success'
     })
+
+@app.route('/api/poll')
+@login_required  
+def poll_clipboard():
+    """Long polling endpoint for clipboard changes"""
+    try:
+        # Get the last known version from query parameter
+        last_version = request.args.get('version', 0, type=int)
+        timeout = request.args.get('timeout', 30, type=int)
+        
+        # Limit timeout to reasonable range
+        timeout = max(1, min(timeout, 60))
+        
+        # Check if there's already a change
+        current_version = get_clipboard_version()
+        if current_version > last_version:
+            entry = get_clipboard_entry()
+            return jsonify({
+                'status': 'success',
+                'data': entry,
+                'version': current_version
+            })
+        
+        # Wait for change
+        entry = wait_for_clipboard_change(last_version, timeout)
+        
+        if entry:
+            return jsonify({
+                'status': 'success',
+                'data': entry,
+                'version': entry.get('version', current_version)
+            })
+        else:
+            # Timeout - return current state
+            return jsonify({
+                'status': 'timeout',
+                'version': current_version,
+                'message': 'No changes within timeout period'
+            })
+            
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/health')
 def health_check():

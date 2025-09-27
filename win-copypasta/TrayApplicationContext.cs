@@ -97,6 +97,13 @@ namespace CopyPasta
         {
             _settings = Settings.Load();
             _client = new CopyPastaClient(_settings);
+            _client.ClipboardChangedOnServer += OnClipboardChangedOnServer;
+            
+            // Start polling if configured
+            if (_settings.IsConfigured)
+            {
+                _client.StartPolling();
+            }
         }
 
         private void StartClipboardMonitoring()
@@ -137,6 +144,20 @@ namespace CopyPasta
             ShowSettings();
         }
 
+        private void OnClipboardChangedOnServer(object? sender, ClipboardChangedEventArgs e)
+        {
+            try
+            {
+                // Update the system clipboard with content from server
+                _clipboardMonitor.SetClipboardContent(e.Content, e.ContentType);
+                UpdateTrayIcon("Clipboard updated from server", ToolTipIcon.Info);
+            }
+            catch (Exception ex)
+            {
+                UpdateTrayIcon($"Failed to update clipboard: {ex.Message}", ToolTipIcon.Error);
+            }
+        }
+
         private void ShowSettings()
         {
             using (var settingsForm = new SettingsForm(_settings))
@@ -145,6 +166,12 @@ namespace CopyPasta
                 {
                     _settings.Save();
                     _client.UpdateSettings(_settings);
+                    
+                    // Restart polling if now configured
+                    if (_settings.IsConfigured)
+                    {
+                        _client.StartPolling();
+                    }
                 }
             }
         }

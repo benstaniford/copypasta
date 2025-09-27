@@ -16,8 +16,10 @@ namespace CopyPasta
 
     public class ClipboardChangedEventArgs : EventArgs
     {
-        public string Content { get; }
-        public ClipboardContentType ContentType { get; }
+        public string Content { get; set; } = "";
+        public ClipboardContentType ContentType { get; set; }
+
+        public ClipboardChangedEventArgs() { }
 
         public ClipboardChangedEventArgs(string content, ClipboardContentType contentType)
         {
@@ -165,6 +167,88 @@ namespace CopyPasta
                 System.Diagnostics.Debug.WriteLine($"Error converting RTF to HTML: {ex.Message}");
                 // Fallback to plain text
                 return Clipboard.GetText();
+            }
+        }
+
+        public void SetClipboardContent(string content, ClipboardContentType contentType)
+        {
+            try
+            {
+                // Temporarily disable monitoring to avoid triggering our own event
+                _lastClipboardContent = content;
+
+                switch (contentType)
+                {
+                    case ClipboardContentType.Text:
+                        Clipboard.SetText(content);
+                        break;
+
+                    case ClipboardContentType.RichText:
+                        // For rich text, we'll set it as HTML if it contains HTML tags
+                        if (content.Contains("<") && content.Contains(">"))
+                        {
+                            var dataObject = new DataObject();
+                            dataObject.SetData(DataFormats.Html, content);
+                            dataObject.SetData(DataFormats.Text, StripHtmlTags(content));
+                            Clipboard.SetDataObject(dataObject);
+                        }
+                        else
+                        {
+                            Clipboard.SetText(content);
+                        }
+                        break;
+
+                    case ClipboardContentType.Image:
+                        // Convert base64 back to image
+                        var image = ConvertBase64ToImage(content);
+                        if (image != null)
+                        {
+                            Clipboard.SetImage(image);
+                        }
+                        break;
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error setting clipboard content: {ex.Message}");
+            }
+        }
+
+        private Image? ConvertBase64ToImage(string base64Content)
+        {
+            try
+            {
+                // Remove data URL prefix if present
+                var base64Data = base64Content;
+                if (base64Data.StartsWith("data:image/"))
+                {
+                    var commaIndex = base64Data.IndexOf(',');
+                    if (commaIndex >= 0)
+                    {
+                        base64Data = base64Data.Substring(commaIndex + 1);
+                    }
+                }
+
+                var imageBytes = Convert.FromBase64String(base64Data);
+                using var memoryStream = new MemoryStream(imageBytes);
+                return new Bitmap(memoryStream);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error converting base64 to image: {ex.Message}");
+                return null;
+            }
+        }
+
+        private string StripHtmlTags(string html)
+        {
+            try
+            {
+                return System.Text.RegularExpressions.Regex.Replace(html, "<.*?>", string.Empty);
+            }
+            catch
+            {
+                return html;
             }
         }
 
