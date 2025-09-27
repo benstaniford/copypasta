@@ -112,13 +112,6 @@
             border-radius: 4px;
             margin: 4px 0;
         }
-        .paste-options {
-            margin: 0.5rem 0;
-        }
-        .paste-options label {
-            margin-right: 1rem;
-            font-size: 0.9rem;
-        }
         .file-input-wrapper {
             position: relative;
             display: inline-block;
@@ -218,13 +211,7 @@
             <div class="clipboard-container">
                 <div class="paste-section">
                     <h3>📋 Paste Content</h3>
-                    <div id="pasteArea" contenteditable="true" class="paste-area" placeholder="Paste your text or rich content here..."></div>
-                    <textarea id="pasteText" placeholder="Or paste plain text here..." style="display: none;"></textarea>
-                    
-                    <div class="paste-options">
-                        <label><input type="radio" name="pasteMode" value="rich" checked> Rich Text & Images</label>
-                        <label><input type="radio" name="pasteMode" value="plain"> Plain Text Only</label>
-                    </div>
+                    <div id="pasteArea" contenteditable="true" class="paste-area" placeholder="Paste your content here... (supports text, rich text, and images)"></div>
                     
                     <div class="file-input-wrapper">
                         <label for="imageInput" class="file-input-label">📷 Upload Image</label>
@@ -260,12 +247,6 @@
         document.addEventListener('DOMContentLoaded', function() {
             refreshClipboard();
             
-            // Handle paste mode switching
-            const pasteModeRadios = document.querySelectorAll('input[name="pasteMode"]');
-            pasteModeRadios.forEach(radio => {
-                radio.addEventListener('change', switchPasteMode);
-            });
-            
             // Handle image file selection
             document.getElementById('imageInput').addEventListener('change', function(e) {
                 const file = e.target.files[0];
@@ -278,25 +259,11 @@
                 }
             });
             
-            // Handle paste events for rich text area
-            document.getElementById('pasteArea').addEventListener('paste', handleRichPaste);
+            // Handle paste events for automatic content detection
+            document.getElementById('pasteArea').addEventListener('paste', handleSmartPaste);
         });
 
-        function switchPasteMode() {
-            const selectedMode = document.querySelector('input[name="pasteMode"]:checked').value;
-            const pasteArea = document.getElementById('pasteArea');
-            const pasteText = document.getElementById('pasteText');
-            
-            if (selectedMode === 'rich') {
-                pasteArea.style.display = 'block';
-                pasteText.style.display = 'none';
-            } else {
-                pasteArea.style.display = 'none';
-                pasteText.style.display = 'block';
-            }
-        }
-
-        function handleRichPaste(e) {
+        function handleSmartPaste(e) {
             e.preventDefault();
             
             const clipboardData = e.clipboardData || window.clipboardData;
@@ -321,21 +288,43 @@
                         } else {
                             document.getElementById('pasteArea').appendChild(img);
                         }
+                        
+                        // Show helpful message about automatic rich content detection
+                        showStatus('pasteStatus', 'Image detected and added! Content will be saved as rich text.', false);
                     };
                     reader.readAsDataURL(blob);
                     return;
                 }
             }
             
-            // Handle HTML/rich text
+            // Handle HTML/rich text vs plain text
             const htmlData = clipboardData.getData('text/html');
             const textData = clipboardData.getData('text/plain');
             
-            if (htmlData) {
+            if (htmlData && isRichContent(htmlData, textData)) {
+                // Insert rich content and show detection message
                 document.execCommand('insertHTML', false, htmlData);
+                showStatus('pasteStatus', 'Rich text detected! Formatting will be preserved.', false);
             } else if (textData) {
+                // Insert as plain text
                 document.execCommand('insertText', false, textData);
+                showStatus('pasteStatus', 'Plain text detected.', false);
             }
+        }
+
+        function isRichContent(htmlData, textData) {
+            // Check if HTML contains actual formatting beyond basic tags
+            const tempDiv = document.createElement('div');
+            tempDiv.innerHTML = htmlData;
+            
+            // Remove simple wrapper tags that don't indicate rich content
+            const strippedHTML = htmlData.replace(/<\/?(?:div|span|p|br)[^>]*>/gi, '').replace(/\s/g, '');
+            const strippedText = (textData || '').replace(/\s/g, '');
+            
+            // If HTML is significantly different from plain text, it's rich content
+            // Also check for common rich text elements
+            return strippedHTML !== strippedText || 
+                   /<(?:strong|em|b|i|u|img|a|ul|ol|li|h[1-6]|table|td|th|blockquote)/i.test(htmlData);
         }
 
         function showStatus(elementId, message, isError = false) {
@@ -355,30 +344,21 @@
                 let contentData = content;
                 
                 if (!contentData) {
-                    const selectedMode = document.querySelector('input[name="pasteMode"]:checked').value;
+                    const pasteArea = document.getElementById('pasteArea');
+                    if (pasteArea.innerHTML.trim() === '' || pasteArea.innerHTML === '<br>') {
+                        showStatus('pasteStatus', 'Please enter some content to paste', true);
+                        return;
+                    }
                     
-                    if (selectedMode === 'rich') {
-                        const pasteArea = document.getElementById('pasteArea');
-                        if (pasteArea.innerHTML.trim() === '' || pasteArea.innerHTML === '<br>') {
-                            showStatus('pasteStatus', 'Please enter some content to paste', true);
-                            return;
-                        }
-                        
-                        // Check if content contains images or formatting
-                        if (pasteArea.querySelector('img') || pasteArea.innerHTML !== pasteArea.textContent) {
-                            contentType = 'rich';
-                            contentData = pasteArea.innerHTML;
-                        } else {
-                            contentType = 'text';
-                            contentData = pasteArea.textContent;
-                        }
+                    // Automatically detect content type and extract data
+                    if (pasteArea.querySelector('img') || pasteArea.innerHTML !== pasteArea.textContent) {
+                        contentType = 'rich';
+                        contentData = pasteArea.innerHTML;
+                        showStatus('pasteStatus', `Saving as rich text...`, false);
                     } else {
-                        contentData = document.getElementById('pasteText').value.trim();
-                        if (!contentData) {
-                            showStatus('pasteStatus', 'Please enter some content to paste', true);
-                            return;
-                        }
                         contentType = 'text';
+                        contentData = pasteArea.textContent;
+                        showStatus('pasteStatus', `Saving as plain text...`, false);
                     }
                 }
 
@@ -396,14 +376,9 @@
                 const result = await response.json();
                 
                 if (response.ok) {
-                    showStatus('pasteStatus', 'Content saved to clipboard!');
+                    showStatus('pasteStatus', `${contentType === 'rich' ? 'Rich content' : contentType === 'image' ? 'Image' : 'Text'} saved to clipboard!`);
                     if (contentType === 'text' || contentType === 'rich') {
-                        const selectedMode = document.querySelector('input[name="pasteMode"]:checked').value;
-                        if (selectedMode === 'rich') {
-                            document.getElementById('pasteArea').innerHTML = '';
-                        } else {
-                            document.getElementById('pasteText').value = '';
-                        }
+                        document.getElementById('pasteArea').innerHTML = '';
                     } else {
                         document.getElementById('imageInput').value = '';
                     }
@@ -417,9 +392,6 @@
         }
 
         function detectContentType() {
-            const selectedMode = document.querySelector('input[name="pasteMode"]:checked').value;
-            if (selectedMode === 'plain') return 'text';
-            
             const pasteArea = document.getElementById('pasteArea');
             if (pasteArea.querySelector('img')) return 'rich';
             if (pasteArea.innerHTML !== pasteArea.textContent) return 'rich';
