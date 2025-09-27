@@ -62,277 +62,9 @@ jobs:
           name: copypasta-docker
           path: copypasta-docker-${{ steps.version.outputs.VERSION }}.tar.gz
 
-  build-windows:
-    runs-on: windows-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Setup .NET
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: '6.0.x'
-
-      - name: Setup MSBuild
-        uses: microsoft/setup-msbuild@v1.3
-
-      - name: Verify MSBuild
-        run: |
-          Write-Host "MSBuild version:"
-          msbuild -version
-          Write-Host "MSBuild path:"
-          Get-Command msbuild | Select-Object -ExpandProperty Source
-        shell: powershell
-
-      - name: Setup WiX Toolset
-        run: |
-          # Download and install WiX Toolset v3.14
-          Write-Host "Downloading WiX Toolset v3.14..."
-          Invoke-WebRequest -Uri "https://github.com/wixtoolset/wix3/releases/download/wix3141rtm/wix314.exe" -OutFile "wix314.exe"
-          
-          Write-Host "Installing WiX Toolset v3.14..."
-          Start-Process -FilePath "wix314.exe" -ArgumentList "/quiet" -Wait
-          
-          # Give it a moment to complete installation
-          Start-Sleep -Seconds 5
-          
-          # Check for both possible installation paths
-          $wixPath = ""
-          if (Test-Path "C:\Program Files (x86)\WiX Toolset v3.14\bin") {
-            $wixPath = "C:\Program Files (x86)\WiX Toolset v3.14\bin"
-            Write-Host "✅ WiX Toolset v3.14 installed successfully at $wixPath"
-          } elseif (Test-Path "C:\Program Files\WiX Toolset v3.14\bin") {
-            $wixPath = "C:\Program Files\WiX Toolset v3.14\bin"
-            Write-Host "✅ WiX Toolset v3.14 installed successfully at $wixPath"
-          } else {
-            Write-Host "❌ WiX Toolset installation failed. Checking available directories..."
-            Write-Host "Program Files (x86) contents:"
-            if (Test-Path "C:\Program Files (x86)") {
-              Get-ChildItem "C:\Program Files (x86)" | Where-Object { $_.Name -like "*WiX*" } | Select-Object Name
-            }
-            Write-Host "Program Files contents:"
-            if (Test-Path "C:\Program Files") {
-              Get-ChildItem "C:\Program Files" | Where-Object { $_.Name -like "*WiX*" } | Select-Object Name
-            }
-            exit 1
-          }
-          
-          # Show what's in the bin directory
-          Write-Host "WiX bin directory contents:"
-          Get-ChildItem $wixPath | Select-Object Name | Format-Table
-          
-          # Add WiX to PATH
-          $env:PATH += ";$wixPath"
-          echo $wixPath | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
-          
-          # Verify candle.exe is available
-          Write-Host "Verifying candle.exe..."
-          if (Test-Path "$wixPath\candle.exe") {
-            Write-Host "✅ candle.exe found at $wixPath\candle.exe"
-          } else {
-            Write-Error "❌ candle.exe not found at $wixPath\candle.exe"
-            exit 1
-          }
-          
-          # Set up MSBuild integration for WiX
-          Write-Host "Setting up WiX MSBuild integration..."
-          $dotnetInfo = dotnet --info
-          $basePath = ($dotnetInfo | Select-String "Base Path:" | ForEach-Object { $_.ToString().Split(":", 2)[1].Trim() })
-          Write-Host "Detected .NET SDK Base Path: $basePath"
-          $wixTargetsDir = "$basePath\Microsoft\WiX\v3.x"
-          
-          Write-Host "Creating WiX targets directory: $wixTargetsDir"
-          New-Item -ItemType Directory -Force -Path $wixTargetsDir
-          
-          # Copy WiX MSBuild targets - check multiple possible locations and names
-          $wixToolsetPath = Split-Path $wixPath -Parent
-          $possibleTargetFiles = @(
-            "$wixPath\wix.targets",
-            "$wixPath\Wix.targets", 
-            "$wixToolsetPath\SDK\wix.targets",
-            "$wixToolsetPath\SDK\Wix.targets",
-            "$wixToolsetPath\SDK\wix.ca.targets",
-            "$wixPath\..\MSBuildTasks\wix.targets",
-            "$wixPath\..\MSBuildTasks\Wix.targets"
-          )
-          
-          $sourceTargets = $null
-          foreach ($targetFile in $possibleTargetFiles) {
-            if (Test-Path $targetFile) {
-              $sourceTargets = $targetFile
-              Write-Host "Found WiX targets file at: $sourceTargets"
-              break
-            }
-          }
-          
-          if ($sourceTargets) {
-            $destTargets = "$wixTargetsDir\Wix.targets"
-            Copy-Item $sourceTargets $destTargets -Force
-            Write-Host "✅ Copied WiX targets to .NET SDK: $destTargets"
-          } else {
-            Write-Host "⚠️ WiX targets file not found. Checked locations:"
-            foreach ($targetFile in $possibleTargetFiles) {
-              Write-Host "  - $targetFile"
-            }
-            Write-Host "Listing WiX installation directory contents:"
-            Get-ChildItem "$wixPath\.." -Recurse -Filter "*.targets" | Select-Object FullName
-            Write-Host "Continuing without MSBuild integration (candle.exe should still work)"
-          }
-          
-          # Copy other necessary WiX files if available
-          $possibleWixTasksPaths = @(
-            "$wixToolsetPath\bin\WixTasks.dll",
-            "$wixPath\WixTasks.dll"
-          )
-          
-          $wixTasksFound = $false
-          foreach ($wixTasksPath in $possibleWixTasksPaths) {
-            if (Test-Path $wixTasksPath) {
-              Copy-Item $wixTasksPath $wixTargetsDir -Force
-              Write-Host "✅ Copied WixTasks.dll from $wixTasksPath to .NET SDK"
-              $wixTasksFound = $true
-              break
-            }
-          }
-          
-          if (-not $wixTasksFound) {
-            Write-Host "⚠️ WixTasks.dll not found. Checked locations:"
-            foreach ($path in $possibleWixTasksPaths) {
-              Write-Host "  - $path"
-            }
-          }
-          
-          # Verify the integration (but don't fail if targets file wasn't found)
-          if ($sourceTargets -and (Test-Path "$wixTargetsDir\Wix.targets")) {
-            Write-Host "✅ WiX MSBuild integration completed successfully"
-          } else {
-            Write-Host "⚠️ WiX MSBuild integration partially completed - will use direct candle.exe/light.exe calls"
-          }
-        shell: powershell
-
-      - name: Extract version
-        id: version
-        run: |
-          if ("${{ github.event_name }}" -eq "workflow_dispatch") {
-            $version = "${{ github.event.inputs.version }}"
-          } else {
-            $version = "${{ github.ref }}" -replace "refs/tags/", ""
-          }
-          echo "VERSION=$version" >> $env:GITHUB_OUTPUT
-          
-          # Extract numeric version (remove 'v' prefix if present)
-          $numericVersion = $version -replace "^v", ""
-          echo "NUMERIC_VERSION=$numericVersion" >> $env:GITHUB_OUTPUT
-        shell: powershell
-
-      - name: Restore dependencies
-        run: |
-          dotnet restore win-copypasta/CopyPasta.sln
-          
-          # Also try to restore NuGet packages for WiX if available
-          if (Test-Path "win-copypasta/CopyPasta.Installer/packages.config") {
-            Write-Host "Restoring NuGet packages for WiX project..."
-            nuget restore win-copypasta/CopyPasta.Installer/packages.config -PackagesDirectory win-copypasta/packages
-          }
-        shell: powershell
-
-      - name: Update version in project files
-        run: |
-          # Update version in .csproj
-          $csprojPath = "win-copypasta/CopyPasta.csproj"
-          $content = Get-Content $csprojPath -Raw
-          $content = $content -replace "<AssemblyVersion>.*</AssemblyVersion>", "<AssemblyVersion>${{ steps.version.outputs.NUMERIC_VERSION }}</AssemblyVersion>"
-          $content = $content -replace "<FileVersion>.*</FileVersion>", "<FileVersion>${{ steps.version.outputs.NUMERIC_VERSION }}</FileVersion>"
-          Set-Content $csprojPath $content
-          
-          # Update version in WiX project
-          $wixPath = "win-copypasta/CopyPasta.Installer/Product.wxs"
-          $content = Get-Content $wixPath -Raw
-          $content = $content -replace 'Version="[^"]*"', 'Version="${{ steps.version.outputs.NUMERIC_VERSION }}"'
-          Set-Content $wixPath $content
-        shell: powershell
-
-      - name: Build application
-        run: dotnet build win-copypasta/CopyPasta.csproj --configuration Release --no-restore
-
-      - name: Build installer
-        run: |
-          # Find WiX installation path
-          $wixTargetsPath = ""
-          if (Test-Path "C:\Program Files (x86)\WiX Toolset v3.14\bin\wix.targets") {
-            $wixTargetsPath = "C:\Program Files (x86)\WiX Toolset v3.14\bin\wix.targets"
-          } elseif (Test-Path "C:\Program Files\WiX Toolset v3.14\bin\wix.targets") {
-            $wixTargetsPath = "C:\Program Files\WiX Toolset v3.14\bin\wix.targets"
-          } elseif (Test-Path "C:\Program Files (x86)\WiX Toolset v3.11\bin\wix.targets") {
-            $wixTargetsPath = "C:\Program Files (x86)\WiX Toolset v3.11\bin\wix.targets"
-          } else {
-            Write-Error "WiX Toolset targets not found"
-            Write-Host "Searched paths:"
-            Write-Host "- C:\Program Files (x86)\WiX Toolset v3.14\bin\wix.targets"
-            Write-Host "- C:\Program Files\WiX Toolset v3.14\bin\wix.targets"
-            Write-Host "- C:\Program Files (x86)\WiX Toolset v3.11\bin\wix.targets"
-            exit 1
-          }
-          
-          Write-Host "Using WiX targets at: $wixTargetsPath"
-          
-          # Build the installer
-          msbuild win-copypasta/CopyPasta.Installer/CopyPasta.Installer.wixproj /p:Configuration=Release /p:Platform=x86 /p:WixTargetsPath="$wixTargetsPath" /verbosity:minimal
-        shell: powershell
-
-      - name: Verify MSI exists
-        run: |
-          $msiPath = "win-copypasta/CopyPasta.Installer/bin/Release/CopyPasta-Setup.msi"
-          if (Test-Path $msiPath) {
-            Write-Host "✓ MSI file found: $msiPath"
-            $size = (Get-Item $msiPath).Length
-            Write-Host "✓ MSI size: $([math]::Round($size / 1MB, 2)) MB"
-          } else {
-            Write-Host "✗ MSI file not found: $msiPath"
-            Get-ChildItem win-copypasta/CopyPasta.Installer/bin -Recurse
-            exit 1
-          }
-        shell: powershell
-
-      - name: Sign installer (if certificate available)
-        if: env.SIGNING_CERT != ''
-        run: |
-          # This would sign the installer if a certificate is available
-          # signtool sign /f certificate.p12 /p password /t http://timestamp.sectigo.com win-copypasta/CopyPasta.Installer/bin/Release/CopyPasta-Setup.msi
-          echo "Code signing certificate not configured"
-        env:
-          SIGNING_CERT: ${{ secrets.SIGNING_CERT }}
-        shell: powershell
-
-      - name: Rename installer
-        run: |
-          $version = "${{ steps.version.outputs.VERSION }}"
-          $sourcePath = "win-copypasta/CopyPasta.Installer/bin/Release/CopyPasta-Setup.msi"
-          $targetPath = "CopyPasta-Setup-$version.msi"
-          Move-Item $sourcePath $targetPath
-          Write-Host "✓ Installer renamed to: $targetPath"
-        shell: powershell
-
-      - name: Upload Windows installer artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: copypasta-windows-installer
-          path: CopyPasta-Setup-${{ steps.version.outputs.VERSION }}.msi
-
-      - name: Build portable executable
-        run: |
-          dotnet publish win-copypasta/CopyPasta.csproj --configuration Release --runtime win-x64 --self-contained true -p:PublishSingleFile=true --output portable/
-          Compress-Archive -Path portable/CopyPasta.exe -DestinationPath CopyPasta-Portable-${{ steps.version.outputs.VERSION }}.zip
-        shell: powershell
-
-      - name: Upload portable artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: copypasta-windows-portable
-          path: CopyPasta-Portable-${{ steps.version.outputs.VERSION }}.zip
 
   create-release:
-    needs: [build-docker, build-windows]
+    needs: [build-docker]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -360,32 +92,23 @@ jobs:
           
           ## What's New
           
-          Cross-device clipboard sharing with automatic content detection and rich text support.
+          Cross-device clipboard sharing application built with Flask.
           
           ## Downloads
-          
-          ### Windows
-          - **CopyPasta-Setup-${{ steps.version.outputs.VERSION }}.msi** - Windows installer (recommended)
-          - **CopyPasta-Portable-${{ steps.version.outputs.VERSION }}.zip** - Portable executable
           
           ### Docker
           - **copypasta-docker-${{ steps.version.outputs.VERSION }}.tar.gz** - Docker image
           
           ## Features
           
-          - 🖥️ **Windows Tray Application**: Automatic clipboard monitoring and sync
           - 🌐 **Web Interface**: Access clipboard from any device with a web browser
-          - 📝 **Rich Text Support**: Preserves formatting in copied text
+          - 📝 **Text Support**: Share text content across devices
           - 🖼️ **Image Support**: Copy and paste images across devices
           - 🔒 **Authentication**: Secure login system
           - 🐳 **Docker Deployment**: Easy server setup with Docker
+          - 💾 **SQLite Database**: Persistent clipboard storage
           
           ## Installation
-          
-          ### Windows Client
-          1. Download and run `CopyPasta-Setup-${{ steps.version.outputs.VERSION }}.msi`
-          2. Configure server endpoint and credentials
-          3. Start copying content between devices!
           
           ### Server (Docker)
           
@@ -409,7 +132,6 @@ jobs:
           
           ## System Requirements
           
-          - **Windows Client**: Windows 10 or later, .NET 6.0 Runtime
           - **Server**: Docker or Python 3.11+
           
           EOF
@@ -426,25 +148,6 @@ jobs:
           draft: false
           prerelease: false
 
-      - name: Upload Windows Installer
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: artifacts/copypasta-windows-installer/CopyPasta-Setup-${{ steps.version.outputs.VERSION }}.msi
-          asset_name: CopyPasta-Setup-${{ steps.version.outputs.VERSION }}.msi
-          asset_content_type: application/x-msi
-
-      - name: Upload Windows Portable
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: artifacts/copypasta-windows-portable/CopyPasta-Portable-${{ steps.version.outputs.VERSION }}.zip
-          asset_name: CopyPasta-Portable-${{ steps.version.outputs.VERSION }}.zip
-          asset_content_type: application/zip
 
       - name: Upload Docker Image
         uses: actions/upload-release-asset@v1
