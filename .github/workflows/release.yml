@@ -44,10 +44,11 @@ jobs:
           NUMERIC_VERSION=$(echo "${{ github.event_name == 'workflow_dispatch' && github.event.inputs.version || github.ref_name }}" | sed 's/^v//')
           echo "NUMERIC_VERSION=$NUMERIC_VERSION" >> $GITHUB_OUTPUT
 
-      - name: Update version in setup.py
+      - name: Update version in setup.py and changelog
         run: |
           cd linux-cli
           sed -i 's/version="1.0.0"/version="${{ steps.version.outputs.NUMERIC_VERSION }}"/' setup.py
+          sed -i '1s/copyp (1.0.0-1)/copyp (${{ steps.version.outputs.NUMERIC_VERSION }}-1)/' debian/changelog
 
       - name: Build Debian package
         run: |
