@@ -47,7 +47,21 @@ namespace CopyPasta
         {
             _clipboardForm = new ClipboardForm();
             _clipboardForm.ClipboardUpdate += OnClipboardUpdate;
-            _clipboardForm.CreateControl();
+            
+            // Ensure the form is created and has a handle
+            if (!_clipboardForm.IsHandleCreated)
+            {
+                _clipboardForm.CreateControl();
+                
+                // Force handle creation if it still doesn't exist
+                if (!_clipboardForm.IsHandleCreated)
+                {
+                    var handle = _clipboardForm.Handle; // This forces handle creation
+                    System.Diagnostics.Debug.WriteLine($"ClipboardMonitor: Handle created: {handle}");
+                }
+            }
+            
+            System.Diagnostics.Debug.WriteLine("ClipboardMonitor: Started monitoring clipboard");
         }
 
         public void Stop()
@@ -58,6 +72,11 @@ namespace CopyPasta
 
         private void OnClipboardUpdate()
         {
+            System.Diagnostics.Debug.WriteLine("ClipboardMonitor: OnClipboardUpdate called");
+            
+            // Small delay to ensure clipboard is ready
+            System.Threading.Thread.Sleep(50);
+            
             try
             {
                 if (Clipboard.ContainsData(DataFormats.Bitmap) || Clipboard.ContainsImage())
@@ -173,12 +192,20 @@ namespace CopyPasta
         protected override void CreateHandle()
         {
             base.CreateHandle();
-            AddClipboardFormatListener(Handle);
+            bool success = AddClipboardFormatListener(Handle);
+            System.Diagnostics.Debug.WriteLine($"ClipboardForm: Handle created {Handle}, AddClipboardFormatListener result: {success}");
+            
+            if (!success)
+            {
+                int error = Marshal.GetLastWin32Error();
+                System.Diagnostics.Debug.WriteLine($"ClipboardForm: AddClipboardFormatListener failed with error: {error}");
+            }
         }
 
         protected override void DestroyHandle()
         {
-            RemoveClipboardFormatListener(Handle);
+            bool success = RemoveClipboardFormatListener(Handle);
+            System.Diagnostics.Debug.WriteLine($"ClipboardForm: RemoveClipboardFormatListener result: {success}");
             base.DestroyHandle();
         }
 
@@ -186,6 +213,7 @@ namespace CopyPasta
         {
             if (m.Msg == WM_CLIPBOARDUPDATE)
             {
+                System.Diagnostics.Debug.WriteLine("ClipboardForm: WM_CLIPBOARDUPDATE received");
                 ClipboardUpdate?.Invoke();
             }
             base.WndProc(ref m);
