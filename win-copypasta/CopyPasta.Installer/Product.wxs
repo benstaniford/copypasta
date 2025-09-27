@@ -59,19 +59,19 @@
     </Directory>
 
     <ComponentGroup Id="ProductComponents" Directory="INSTALLFOLDER">
-      <Component Id="MainExecutable" Guid="*">
+      <Component Id="MainExecutable" Guid="{C1A2B3D4-E5F6-7890-ABCD-123456789001}">
         <File Id="CopyPasta.exe" Source="$(var.CopyPasta.TargetPath)" KeyPath="yes" />
       </Component>
-      <Component Id="DepsJson" Guid="*">
+      <Component Id="DepsJson" Guid="{C1A2B3D4-E5F6-7890-ABCD-123456789002}">
         <File Id="CopyPasta.deps.json" Source="$(var.CopyPasta.TargetDir)CopyPasta.deps.json" />
       </Component>
-      <Component Id="RuntimeConfig" Guid="*">
+      <Component Id="RuntimeConfig" Guid="{C1A2B3D4-E5F6-7890-ABCD-123456789003}">
         <File Id="CopyPasta.runtimeconfig.json" Source="$(var.CopyPasta.TargetDir)CopyPasta.runtimeconfig.json" />
       </Component>
-      <Component Id="MainAssembly" Guid="*">
+      <Component Id="MainAssembly" Guid="{C1A2B3D4-E5F6-7890-ABCD-123456789004}">
         <File Id="CopyPasta.dll" Source="$(var.CopyPasta.TargetDir)CopyPasta.dll" />
       </Component>
-      <Component Id="NewtonsoftJson" Guid="*">
+      <Component Id="NewtonsoftJson" Guid="{C1A2B3D4-E5F6-7890-ABCD-123456789005}">
         <File Id="Newtonsoft.Json.dll" Source="$(var.CopyPasta.TargetDir)Newtonsoft.Json.dll" />
       </Component>
     </ComponentGroup>
