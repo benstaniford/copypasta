@@ -12,6 +12,8 @@ import configparser
 import requests
 import json
 import base64
+import socket
+import uuid
 from pathlib import Path
 
 
@@ -23,6 +25,7 @@ class CopyPastaClient:
         self.username = None
         self.password = None
         self.session = requests.Session()
+        self.client_id = self._generate_client_id()
     
     def load_config(self):
         """Load configuration from ~/.config/copyp.rc"""
@@ -82,6 +85,13 @@ class CopyPastaClient:
         
         print(f"Configuration saved to {self.config_path}")
     
+    def _generate_client_id(self):
+        """Generate a unique client ID based on hostname, username, and a random component"""
+        hostname = socket.gethostname()
+        username = os.getenv('USER', os.getenv('USERNAME', 'unknown'))
+        random_part = str(uuid.uuid4())[:8]  # First 8 chars of UUID
+        return f"{hostname}-{username}-{random_part}"
+    
     def login(self):
         """Login to the CopyPasta service"""
         try:
@@ -110,14 +120,16 @@ class CopyPastaClient:
                 base64.b64decode(data)
                 # If successful, treat as image
                 payload = {
-                    'content_type': 'image',
-                    'content': data
+                    'type': 'image',
+                    'content': data,
+                    'client_id': self.client_id
                 }
             except:
                 # Not valid base64, treat as text
                 payload = {
-                    'content_type': 'text',
-                    'content': data
+                    'type': 'text',
+                    'content': data,
+                    'client_id': self.client_id
                 }
             
             response = self.session.post(f"{self.base_url}/api/paste", json=payload)
