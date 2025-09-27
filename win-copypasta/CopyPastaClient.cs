@@ -18,13 +18,16 @@ namespace CopyPasta
 
         public CopyPastaClient(Settings settings)
         {
+            Logger.Log("CopyPastaClient", "Initializing HTTP client");
             _settings = settings;
             _httpClient = new HttpClient();
             _httpClient.Timeout = TimeSpan.FromSeconds(30);
+            Logger.Log("CopyPastaClient", $"HTTP client initialized with 30s timeout");
         }
 
         public void UpdateSettings(Settings settings)
         {
+            Logger.Log("CopyPastaClient", $"Updating settings - Endpoint: {settings.ServerEndpoint}");
             _settings = settings;
             _sessionCookie = null; // Reset session when settings change
             StopPolling();
@@ -34,11 +37,18 @@ namespace CopyPasta
         {
             try
             {
-                var response = await _httpClient.GetAsync($"{_settings.ServerEndpoint}/health");
-                return response.IsSuccessStatusCode;
+                string url = $"{_settings.ServerEndpoint}/health";
+                Logger.LogNetwork("GET", url, "Starting");
+                
+                var response = await _httpClient.GetAsync(url);
+                bool success = response.IsSuccessStatusCode;
+                
+                Logger.LogNetwork("GET", url, success ? "Success" : "Failed", $"Status: {response.StatusCode}");
+                return success;
             }
-            catch
+            catch (Exception ex)
             {
+                Logger.LogNetwork("GET", $"{_settings.ServerEndpoint}/health", "Exception", ex.Message);
                 return false;
             }
         }
@@ -47,6 +57,8 @@ namespace CopyPasta
         {
             if (!_settings.IsConfigured)
                 throw new InvalidOperationException("CopyPasta client is not configured.");
+
+            Logger.LogNetwork("Upload", "UploadClipboardContent", "Starting", $"Type: {contentType}, Size: {content?.Length ?? 0} bytes");
 
             await EnsureAuthenticated();
 
@@ -67,7 +79,8 @@ namespace CopyPasta
             var json = JsonConvert.SerializeObject(payload);
             var requestContent = new StringContent(json, Encoding.UTF8, "application/json");
 
-            var request = new HttpRequestMessage(HttpMethod.Post, $"{_settings.ServerEndpoint}/api/paste")
+            string url = $"{_settings.ServerEndpoint}/api/paste";
+            var request = new HttpRequestMessage(HttpMethod.Post, url)
             {
                 Content = requestContent
             };
@@ -83,14 +96,24 @@ namespace CopyPasta
             {
                 var errorContent = await response.Content.ReadAsStringAsync();
                 var errorMessage = TryParseErrorMessage(errorContent);
+                Logger.LogNetwork("Upload", url, "Failed", $"Status: {response.StatusCode}, Error: {errorMessage}");
                 throw new HttpRequestException($"Upload failed: {errorMessage}");
+            }
+            else
+            {
+                Logger.LogNetwork("Upload", url, "Success", "Content uploaded successfully");
             }
         }
 
         private async Task EnsureAuthenticated()
         {
             if (!string.IsNullOrEmpty(_sessionCookie))
+            {
+                Logger.LogNetwork("Authentication", "EnsureAuthenticated", "Skipped", "Already authenticated");
                 return; // Already authenticated
+            }
+
+            Logger.LogNetwork("Authentication", "EnsureAuthenticated", "Starting", $"User: {_settings.Username}");
 
             var loginData = new List<KeyValuePair<string, string>>
             {
@@ -99,7 +122,8 @@ namespace CopyPasta
             };
 
             var formContent = new FormUrlEncodedContent(loginData);
-            var response = await _httpClient.PostAsync($"{_settings.ServerEndpoint}/login", formContent);
+            string url = $"{_settings.ServerEndpoint}/login";
+            var response = await _httpClient.PostAsync(url, formContent);
 
             if (response.IsSuccessStatusCode)
             {
@@ -111,6 +135,7 @@ namespace CopyPasta
                         if (cookie.StartsWith("session="))
                         {
                             _sessionCookie = cookie.Split(';')[0]; // Get just the session part
+                            Logger.LogNetwork("Authentication", url, "Success", "Session cookie acquired");
                             break;
                         }
                     }
@@ -118,12 +143,14 @@ namespace CopyPasta
 
                 if (string.IsNullOrEmpty(_sessionCookie))
                 {
+                    Logger.LogNetwork("Authentication", url, "Failed", "No session cookie received");
                     throw new InvalidOperationException("Authentication succeeded but no session cookie received.");
                 }
             }
             else
             {
                 var errorContent = await response.Content.ReadAsStringAsync();
+                Logger.LogNetwork("Authentication", url, "Failed", $"Status: {response.StatusCode}");
                 throw new UnauthorizedAccessException("Authentication failed. Please check your username and password.");
             }
         }
@@ -146,9 +173,12 @@ namespace CopyPasta
             if (!_settings.IsConfigured)
                 return null;
 
+            Logger.LogNetwork("Poll", "GetClipboardContent", "Starting", "Checking for new clipboard content");
+
             await EnsureAuthenticated();
 
-            var request = new HttpRequestMessage(HttpMethod.Get, $"{_settings.ServerEndpoint}/api/clipboard");
+            string url = $"{_settings.ServerEndpoint}/api/clipboard";
+            var request = new HttpRequestMessage(HttpMethod.Get, url);
 
             if (!string.IsNullOrEmpty(_sessionCookie))
             {
@@ -165,8 +195,17 @@ namespace CopyPasta
                 if (result?.Data != null)
                 {
                     _lastKnownVersion = result.Data.Version;
+                    Logger.LogNetwork("Poll", url, "Success", $"New content found, Version: {result.Data.Version}");
                     return result.Data;
                 }
+                else
+                {
+                    Logger.LogNetwork("Poll", url, "Success", "No new content");
+                }
+            }
+            else
+            {
+                Logger.LogNetwork("Poll", url, "Failed", $"Status: {response.StatusCode}");
             }
 
             return null;
@@ -179,6 +218,7 @@ namespace CopyPasta
             if (!_settings.IsConfigured)
                 return;
 
+            Logger.Log("Poll", "Starting clipboard polling");
             StopPolling();
             _pollCancellationTokenSource = new CancellationTokenSource();
             _ = Task.Run(() => PollForChangesAsync(_pollCancellationTokenSource.Token));
@@ -186,6 +226,7 @@ namespace CopyPasta
 
         public void StopPolling()
         {
+            Logger.Log("Poll", "Stopping clipboard polling");
             _pollCancellationTokenSource?.Cancel();
             _pollCancellationTokenSource?.Dispose();
             _pollCancellationTokenSource = null;
@@ -219,6 +260,7 @@ namespace CopyPasta
                         if (result?.Status == "success" && result.Data != null)
                         {
                             _lastKnownVersion = result.Version;
+                            Logger.LogNetwork("LongPoll", url, "NewData", $"Version: {result.Version}, Type: {result.Data.ContentType}");
                             
                             var contentType = result.Data.ContentType switch
                             {
@@ -237,15 +279,22 @@ namespace CopyPasta
                         else if (result?.Status == "timeout")
                         {
                             _lastKnownVersion = result.Version;
+                            Logger.LogNetwork("LongPoll", url, "Timeout", $"Version: {result.Version}");
                         }
+                    }
+                    else
+                    {
+                        Logger.LogNetwork("LongPoll", url, "Failed", $"Status: {response.StatusCode}");
                     }
                 }
                 catch (OperationCanceledException)
                 {
+                    Logger.Log("Poll", "Polling cancelled");
                     break;
                 }
-                catch (Exception)
+                catch (Exception ex)
                 {
+                    Logger.LogError("Poll", "Polling error", ex);
                     // Wait before retrying on error
                     await Task.Delay(5000, cancellationToken);
                 }

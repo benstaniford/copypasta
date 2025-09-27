@@ -47,6 +47,7 @@ namespace CopyPasta
 
         public void Start()
         {
+            Logger.Log("ClipboardMonitor", "Starting clipboard monitoring");
             _clipboardForm = new ClipboardForm();
             _clipboardForm.ClipboardUpdate += OnClipboardUpdate;
             
@@ -59,22 +60,23 @@ namespace CopyPasta
                 if (!_clipboardForm.IsHandleCreated)
                 {
                     var handle = _clipboardForm.Handle; // This forces handle creation
-                    System.Diagnostics.Debug.WriteLine($"ClipboardMonitor: Handle created: {handle}");
+                    Logger.Log("ClipboardMonitor", $"Handle created: {handle}");
                 }
             }
             
-            System.Diagnostics.Debug.WriteLine("ClipboardMonitor: Started monitoring clipboard");
+            Logger.Log("ClipboardMonitor", "Clipboard monitoring started successfully");
         }
 
         public void Stop()
         {
+            Logger.Log("ClipboardMonitor", "Stopping clipboard monitoring");
             _clipboardForm?.Close();
             _clipboardForm?.Dispose();
         }
 
         private void OnClipboardUpdate()
         {
-            System.Diagnostics.Debug.WriteLine("ClipboardMonitor: OnClipboardUpdate called");
+            Logger.Log("ClipboardMonitor", "Clipboard update detected");
             
             // Small delay to ensure clipboard is ready
             System.Threading.Thread.Sleep(50);
@@ -84,6 +86,7 @@ namespace CopyPasta
                 if (Clipboard.ContainsData(DataFormats.Bitmap) || Clipboard.ContainsImage())
                 {
                     // Handle image content
+                    Logger.Log("ClipboardMonitor", "Processing image content");
                     var image = Clipboard.GetImage();
                     if (image != null)
                     {
@@ -91,6 +94,7 @@ namespace CopyPasta
                         if (!string.IsNullOrEmpty(base64Image) && base64Image != _lastClipboardContent)
                         {
                             _lastClipboardContent = base64Image;
+                            Logger.Log("ClipboardMonitor", $"Image content changed, size: {base64Image.Length} chars");
                             ClipboardChanged?.Invoke(this, new ClipboardChangedEventArgs(base64Image, ClipboardContentType.Image));
                         }
                     }
@@ -98,29 +102,33 @@ namespace CopyPasta
                 else if (Clipboard.ContainsData(DataFormats.Rtf))
                 {
                     // Handle rich text content
+                    Logger.Log("ClipboardMonitor", "Processing rich text content");
                     var rtfContent = Clipboard.GetData(DataFormats.Rtf) as string;
                     var htmlContent = ConvertRtfToHtml(rtfContent);
                     
                     if (!string.IsNullOrEmpty(htmlContent) && htmlContent != _lastClipboardContent)
                     {
                         _lastClipboardContent = htmlContent;
+                        Logger.Log("ClipboardMonitor", $"Rich text content changed, length: {htmlContent.Length}");
                         ClipboardChanged?.Invoke(this, new ClipboardChangedEventArgs(htmlContent, ClipboardContentType.RichText));
                     }
                 }
                 else if (Clipboard.ContainsText())
                 {
                     // Handle plain text content
+                    Logger.Log("ClipboardMonitor", "Processing text content");
                     var textContent = Clipboard.GetText();
                     if (!string.IsNullOrEmpty(textContent) && textContent != _lastClipboardContent)
                     {
                         _lastClipboardContent = textContent;
+                        Logger.Log("ClipboardMonitor", $"Text content changed, length: {textContent.Length}");
                         ClipboardChanged?.Invoke(this, new ClipboardChangedEventArgs(textContent, ClipboardContentType.Text));
                     }
                 }
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"Error processing clipboard content: {ex.Message}");
+                Logger.LogError("ClipboardMonitor", "Error processing clipboard content", ex);
             }
         }
 
@@ -135,7 +143,7 @@ namespace CopyPasta
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"Error converting image to base64: {ex.Message}");
+                Logger.LogError("ClipboardMonitor", "Error converting image to base64", ex);
                 return "";
             }
         }
@@ -164,7 +172,7 @@ namespace CopyPasta
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"Error converting RTF to HTML: {ex.Message}");
+                Logger.LogError("ClipboardMonitor", "Error converting RTF to HTML", ex);
                 // Fallback to plain text
                 return Clipboard.GetText();
             }
@@ -277,19 +285,19 @@ namespace CopyPasta
         {
             base.CreateHandle();
             bool success = AddClipboardFormatListener(Handle);
-            System.Diagnostics.Debug.WriteLine($"ClipboardForm: Handle created {Handle}, AddClipboardFormatListener result: {success}");
+            Logger.Log("ClipboardForm", $"Handle created {Handle}, AddClipboardFormatListener result: {success}");
             
             if (!success)
             {
                 int error = Marshal.GetLastWin32Error();
-                System.Diagnostics.Debug.WriteLine($"ClipboardForm: AddClipboardFormatListener failed with error: {error}");
+                Logger.LogError("ClipboardForm", $"AddClipboardFormatListener failed with error: {error}");
             }
         }
 
         protected override void DestroyHandle()
         {
             bool success = RemoveClipboardFormatListener(Handle);
-            System.Diagnostics.Debug.WriteLine($"ClipboardForm: RemoveClipboardFormatListener result: {success}");
+            Logger.Log("ClipboardForm", $"RemoveClipboardFormatListener result: {success}");
             base.DestroyHandle();
         }
 
@@ -297,7 +305,7 @@ namespace CopyPasta
         {
             if (m.Msg == WM_CLIPBOARDUPDATE)
             {
-                System.Diagnostics.Debug.WriteLine("ClipboardForm: WM_CLIPBOARDUPDATE received");
+                Logger.Log("ClipboardForm", "WM_CLIPBOARDUPDATE message received");
                 ClipboardUpdate?.Invoke();
             }
             base.WndProc(ref m);

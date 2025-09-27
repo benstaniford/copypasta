@@ -14,9 +14,11 @@ namespace CopyPasta
 
         public TrayApplicationContext()
         {
+            Logger.Log("TrayApp", "Initializing TrayApplicationContext");
             InitializeComponent();
             LoadSettings();
             StartClipboardMonitoring();
+            Logger.Log("TrayApp", "TrayApplicationContext initialization complete");
         }
 
         private void InitializeComponent()
@@ -76,6 +78,9 @@ namespace CopyPasta
             var settingsItem = new ToolStripMenuItem("Settings...");
             settingsItem.Click += SettingsItem_Click;
             
+            var viewLogsItem = new ToolStripMenuItem("View Logs...");
+            viewLogsItem.Click += ViewLogsItem_Click;
+            
             var separatorItem = new ToolStripSeparator();
             
             var exitItem = new ToolStripMenuItem("Exit");
@@ -86,6 +91,7 @@ namespace CopyPasta
                 statusItem,
                 new ToolStripSeparator(),
                 settingsItem,
+                viewLogsItem,
                 separatorItem,
                 exitItem
             });
@@ -95,6 +101,7 @@ namespace CopyPasta
 
         private void LoadSettings()
         {
+            Logger.Log("TrayApp", "Loading settings");
             _settings = Settings.Load();
             _client = new CopyPastaClient(_settings);
             _client.ClipboardChangedOnServer += OnClipboardChangedOnServer;
@@ -102,12 +109,18 @@ namespace CopyPasta
             // Start polling if configured
             if (_settings.IsConfigured)
             {
+                Logger.Log("TrayApp", "Settings configured, starting polling");
                 _client.StartPolling();
+            }
+            else
+            {
+                Logger.Log("TrayApp", "Settings not configured, skipping polling");
             }
         }
 
         private void StartClipboardMonitoring()
         {
+            Logger.Log("TrayApp", "Starting clipboard monitoring");
             _clipboardMonitor = new ClipboardMonitor();
             _clipboardMonitor.ClipboardChanged += OnClipboardChanged;
             _clipboardMonitor.Start();
@@ -115,17 +128,25 @@ namespace CopyPasta
 
         private async void OnClipboardChanged(object? sender, ClipboardChangedEventArgs e)
         {
+            Logger.Log("TrayApp", $"Clipboard changed: {e.ContentType} content, length: {e.Content?.Length ?? 0}");
+            
             if (_settings.IsConfigured)
             {
                 try
                 {
-                    await _client.UploadClipboardContent(e.Content, e.ContentType);
+                                                await _client.UploadClipboardContent(e.Content ?? string.Empty, e.ContentType);
                     UpdateTrayIcon("Upload successful", ToolTipIcon.Info);
+                    Logger.Log("TrayApp", "Clipboard content uploaded successfully");
                 }
                 catch (Exception ex)
                 {
                     UpdateTrayIcon($"Upload failed: {ex.Message}", ToolTipIcon.Error);
+                    Logger.LogError("TrayApp", "Failed to upload clipboard content", ex);
                 }
+            }
+            else
+            {
+                Logger.Log("TrayApp", "Settings not configured, skipping upload");
             }
         }
 
@@ -141,20 +162,31 @@ namespace CopyPasta
 
         private void SettingsItem_Click(object? sender, EventArgs e)
         {
+            Logger.Log("TrayApp", "Settings menu clicked");
             ShowSettings();
+        }
+
+        private void ViewLogsItem_Click(object? sender, EventArgs e)
+        {
+            Logger.Log("TrayApp", "View Logs menu clicked");
+            Logger.OpenLogFile();
         }
 
         private void OnClipboardChangedOnServer(object? sender, ClipboardChangedEventArgs e)
         {
+            Logger.Log("TrayApp", $"Clipboard changed on server: {e.ContentType} content, length: {e.Content?.Length ?? 0}");
+            
             try
             {
                 // Update the system clipboard with content from server
-                _clipboardMonitor.SetClipboardContent(e.Content, e.ContentType);
+                                        _clipboardMonitor.SetClipboardContent(e.Content ?? string.Empty, e.ContentType);
                 UpdateTrayIcon("Clipboard updated from server", ToolTipIcon.Info);
+                Logger.Log("TrayApp", "System clipboard updated from server");
             }
             catch (Exception ex)
             {
                 UpdateTrayIcon($"Failed to update clipboard: {ex.Message}", ToolTipIcon.Error);
+                Logger.LogError("TrayApp", "Failed to update clipboard from server", ex);
             }
         }
 
