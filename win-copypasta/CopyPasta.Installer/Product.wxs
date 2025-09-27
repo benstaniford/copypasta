@@ -23,6 +23,7 @@
       <ComponentGroupRef Id="ProductComponents" />
       <ComponentRef Id="StartMenuShortcut" />
       <ComponentRef Id="DesktopShortcut" />
+      <ComponentRef Id="AutoStartRegistry" />
     </Feature>
 
     <!-- UI Configuration -->
@@ -62,20 +63,9 @@
       <!-- Main Application -->
       <Component Id="MainExecutable" Guid="11111111-1111-1111-1111-111111111111">
         <File Id="CopyPastaExe" 
-              Source="$(var.CopyPasta.TargetPath)" 
+              Source="$(var.CopyPasta.TargetDir)CopyPasta.exe" 
               KeyPath="yes" 
-              Checksum="yes">
-          <!-- Auto-start registry entry -->
-          <util:RegistryKey xmlns:util="http://schemas.microsoft.com/wix/UtilExtension"
-                           Root="HKCU"
-                           Key="SOFTWARE\Microsoft\Windows\CurrentVersion\Run"
-                           Action="createAndRemoveOnUninstall">
-            <util:RegistryValue Name="CopyPasta" 
-                               Value="&quot;[#CopyPastaExe]&quot;" 
-                               Type="string" 
-                               Action="write" />
-          </util:RegistryKey>
-        </File>
+              Checksum="yes" />
       </Component>
       
       <!-- Runtime Configuration -->
@@ -99,6 +89,18 @@
               KeyPath="yes" />
       </Component>
     </ComponentGroup>
+
+    <!-- Auto-start registry entry -->
+    <Component Id="AutoStartRegistry" 
+               Directory="INSTALLFOLDER" 
+               Guid="77777777-7777-7777-7777-777777777777">
+      <RegistryValue Root="HKCU"
+                     Key="SOFTWARE\Microsoft\Windows\CurrentVersion\Run"
+                     Name="CopyPasta"
+                     Value="&quot;[#CopyPastaExe]&quot;"
+                     Type="string"
+                     KeyPath="yes" />
+    </Component>
 
     <!-- Start Menu Shortcut -->
     <Component Id="StartMenuShortcut" 
