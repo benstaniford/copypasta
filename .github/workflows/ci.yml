@@ -27,20 +27,23 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
 
-    # .NET Build and Test
-    - name: Setup .NET
-      uses: actions/setup-dotnet@v4
-      with:
-        dotnet-version: '6.0.x'
+    # C# Build and Test
+    - name: Setup .NET Framework
+      uses: microsoft/setup-msbuild@v2
 
-    - name: Restore dependencies
-      run: dotnet restore win-copypasta/CopyPasta.sln
+    - name: Setup NuGet
+      uses: nuget/setup-nuget@v1
+      with:
+        nuget-version: 'latest'
+
+    - name: Restore NuGet packages
+      run: nuget restore win-copypasta/CopyPasta.sln
 
     - name: Build C# Project (Debug)
-      run: dotnet build win-copypasta/CopyPasta.csproj --configuration Debug --no-restore
+      run: msbuild win-copypasta/CopyPasta.csproj /p:Configuration=Debug /p:Platform="Any CPU"
 
     - name: Build C# Project (Release)
-      run: dotnet build win-copypasta/CopyPasta.csproj --configuration Release --no-restore
+      run: msbuild win-copypasta/CopyPasta.csproj /p:Configuration=Release /p:Platform="Any CPU"
 
     # Docker tests for main Flask app
     - name: Run Docker tests
@@ -85,11 +88,14 @@ jobs:
         echo "VERSION=$version" >> $env:GITHUB_OUTPUT
         echo "Version: $version"
 
-    # .NET Release Build
-    - name: Setup .NET
-      uses: actions/setup-dotnet@v4
+    # C# Release Build
+    - name: Setup .NET Framework
+      uses: microsoft/setup-msbuild@v2
+
+    - name: Setup NuGet
+      uses: nuget/setup-nuget@v1
       with:
-        dotnet-version: '6.0.x'
+        nuget-version: 'latest'
 
     - name: Update Assembly Version
       run: |
@@ -132,11 +138,11 @@ jobs:
         Write-Host "Updated version line:"
         Get-Content $wxsPath | Select-String "Version="
 
-    - name: Restore dependencies
-      run: dotnet restore win-copypasta/CopyPasta.sln
+    - name: Restore NuGet packages
+      run: nuget restore win-copypasta/CopyPasta.sln
 
     - name: Build C# Project (Release)
-      run: dotnet build win-copypasta/CopyPasta.csproj --configuration Release --no-restore
+      run: msbuild win-copypasta/CopyPasta.csproj /p:Configuration=Release /p:Platform="Any CPU"
 
     # WiX Installer Build
     - name: Setup WiX Toolset
