@@ -118,11 +118,18 @@ namespace CopyPasta
                     // Handle plain text content
                     Logger.Log("ClipboardMonitor", "Processing text content");
                     var textContent = Clipboard.GetText();
+                    Logger.Log("ClipboardMonitor", $"Current clipboard text: '{(textContent?.Length > 50 ? textContent.Substring(0, 50) + "..." : textContent)}'");
+                    Logger.Log("ClipboardMonitor", $"Last known content: '{(_lastClipboardContent?.Length > 50 ? _lastClipboardContent.Substring(0, 50) + "..." : _lastClipboardContent)}'");
+                    
                     if (!string.IsNullOrEmpty(textContent) && textContent != _lastClipboardContent)
                     {
                         _lastClipboardContent = textContent;
                         Logger.Log("ClipboardMonitor", $"Text content changed, length: {textContent.Length}");
                         ClipboardChanged?.Invoke(this, new ClipboardChangedEventArgs(textContent, ClipboardContentType.Text));
+                    }
+                    else
+                    {
+                        Logger.Log("ClipboardMonitor", "Text content unchanged, ignoring event");
                     }
                 }
             }
@@ -182,43 +189,77 @@ namespace CopyPasta
         {
             try
             {
+                Logger.Log("ClipboardMonitor", $"Setting clipboard content: type={contentType}, length={content?.Length ?? 0}");
+                Logger.Log("ClipboardMonitor", $"Content preview: '{(content?.Length > 50 ? content.Substring(0, 50) + "..." : content)}'");
+                
                 // Temporarily disable monitoring to avoid triggering our own event
-                _lastClipboardContent = content;
+                _lastClipboardContent = content ?? string.Empty;
 
-                switch (contentType)
+                // Ensure clipboard operations happen on the UI thread
+                var safeContent = content ?? string.Empty;
+                if (_clipboardForm.InvokeRequired)
                 {
-                    case ClipboardContentType.Text:
+                    Logger.Log("ClipboardMonitor", "Marshaling clipboard operation to UI thread");
+                    _clipboardForm.Invoke(new Action(() => SetClipboardContentInternal(safeContent, contentType)));
+                }
+                else
+                {
+                    SetClipboardContentInternal(safeContent, contentType);
+                }
+                
+                Logger.Log("ClipboardMonitor", "SetClipboardContent completed successfully");
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError("ClipboardMonitor", "Error setting clipboard content", ex);
+            }
+        }
+
+        private void SetClipboardContentInternal(string content, ClipboardContentType contentType)
+        {
+            switch (contentType)
+            {
+                case ClipboardContentType.Text:
+                    if (!string.IsNullOrEmpty(content))
+                    {
                         Clipboard.SetText(content);
-                        break;
+                        Logger.Log("ClipboardMonitor", "Clipboard.SetText() completed");
+                    }
+                    break;
 
-                    case ClipboardContentType.RichText:
-                        // For rich text, we'll set it as HTML if it contains HTML tags
-                        if (content.Contains("<") && content.Contains(">"))
-                        {
-                            var dataObject = new DataObject();
-                            dataObject.SetData(DataFormats.Html, content);
-                            dataObject.SetData(DataFormats.Text, StripHtmlTags(content));
-                            Clipboard.SetDataObject(dataObject);
-                        }
-                        else
-                        {
-                            Clipboard.SetText(content);
-                        }
-                        break;
+                case ClipboardContentType.RichText:
+                    // For rich text, we'll set it as HTML if it contains HTML tags
+                    if (!string.IsNullOrEmpty(content) && content.Contains("<") && content.Contains(">"))
+                    {
+                        var dataObject = new DataObject();
+                        dataObject.SetData(DataFormats.Html, content);
+                        dataObject.SetData(DataFormats.Text, StripHtmlTags(content));
+                        Clipboard.SetDataObject(dataObject);
+                        Logger.Log("ClipboardMonitor", "Clipboard.SetDataObject() completed for HTML content");
+                    }
+                    else if (!string.IsNullOrEmpty(content))
+                    {
+                        Clipboard.SetText(content);
+                        Logger.Log("ClipboardMonitor", "Clipboard.SetText() completed for rich text");
+                    }
+                    break;
 
-                    case ClipboardContentType.Image:
-                        // Convert base64 back to image
+                case ClipboardContentType.Image:
+                    // Convert base64 back to image
+                    if (!string.IsNullOrEmpty(content))
+                    {
                         var image = ConvertBase64ToImage(content);
                         if (image != null)
                         {
                             Clipboard.SetImage(image);
+                            Logger.Log("ClipboardMonitor", "Clipboard.SetImage() completed");
                         }
-                        break;
-                }
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Error setting clipboard content: {ex.Message}");
+                        else
+                        {
+                            Logger.LogError("ClipboardMonitor", "Failed to convert base64 to image", null);
+                        }
+                    }
+                    break;
             }
         }
 
