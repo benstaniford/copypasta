@@ -133,6 +133,42 @@ jobs:
             Write-Error "❌ candle.exe not found at $wixPath\candle.exe"
             exit 1
           }
+          
+          # Set up MSBuild integration for WiX
+          Write-Host "Setting up WiX MSBuild integration..."
+          $dotnetSdkPath = (dotnet --info | Select-String "Base Path:" | ForEach-Object { $_.ToString().Split(":")[1].Trim() })
+          $wixTargetsDir = "$dotnetSdkPath\Microsoft\WiX\v3.x"
+          
+          Write-Host "Creating WiX targets directory: $wixTargetsDir"
+          New-Item -ItemType Directory -Force -Path $wixTargetsDir
+          
+          # Copy WiX MSBuild targets
+          $sourceTargets = "$wixPath\wix.targets"
+          $destTargets = "$wixTargetsDir\Wix.targets"
+          
+          if (Test-Path $sourceTargets) {
+            Copy-Item $sourceTargets $destTargets -Force
+            Write-Host "✅ Copied WiX targets to .NET SDK: $destTargets"
+          } else {
+            Write-Error "❌ WiX targets file not found at $sourceTargets"
+            exit 1
+          }
+          
+          # Copy other necessary WiX files
+          $wixToolsetPath = Split-Path $wixPath -Parent
+          $wixTasksPath = "$wixToolsetPath\bin\WixTasks.dll"
+          if (Test-Path $wixTasksPath) {
+            Copy-Item $wixTasksPath $wixTargetsDir -Force
+            Write-Host "✅ Copied WixTasks.dll to .NET SDK"
+          }
+          
+          # Verify the integration
+          if (Test-Path $destTargets) {
+            Write-Host "✅ WiX MSBuild integration completed successfully"
+          } else {
+            Write-Error "❌ WiX MSBuild integration failed"
+            exit 1
+          }
         shell: powershell
 
       - name: Extract version
