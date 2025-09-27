@@ -145,9 +145,13 @@ jobs:
           New-Item -ItemType Directory -Force -Path $wixTargetsDir
           
           # Copy WiX MSBuild targets - check multiple possible locations and names
+          $wixToolsetPath = Split-Path $wixPath -Parent
           $possibleTargetFiles = @(
             "$wixPath\wix.targets",
             "$wixPath\Wix.targets", 
+            "$wixToolsetPath\SDK\wix.targets",
+            "$wixToolsetPath\SDK\Wix.targets",
+            "$wixToolsetPath\SDK\wix.ca.targets",
             "$wixPath\..\MSBuildTasks\wix.targets",
             "$wixPath\..\MSBuildTasks\Wix.targets"
           )
@@ -176,13 +180,26 @@ jobs:
           }
           
           # Copy other necessary WiX files if available
-          $wixToolsetPath = Split-Path $wixPath -Parent
-          $wixTasksPath = "$wixToolsetPath\bin\WixTasks.dll"
-          if (Test-Path $wixTasksPath) {
-            Copy-Item $wixTasksPath $wixTargetsDir -Force
-            Write-Host "✅ Copied WixTasks.dll to .NET SDK"
-          } else {
-            Write-Host "⚠️ WixTasks.dll not found at $wixTasksPath"
+          $possibleWixTasksPaths = @(
+            "$wixToolsetPath\bin\WixTasks.dll",
+            "$wixPath\WixTasks.dll"
+          )
+          
+          $wixTasksFound = $false
+          foreach ($wixTasksPath in $possibleWixTasksPaths) {
+            if (Test-Path $wixTasksPath) {
+              Copy-Item $wixTasksPath $wixTargetsDir -Force
+              Write-Host "✅ Copied WixTasks.dll from $wixTasksPath to .NET SDK"
+              $wixTasksFound = $true
+              break
+            }
+          }
+          
+          if (-not $wixTasksFound) {
+            Write-Host "⚠️ WixTasks.dll not found. Checked locations:"
+            foreach ($path in $possibleWixTasksPaths) {
+              Write-Host "  - $path"
+            }
           }
           
           # Verify the integration (but don't fail if targets file wasn't found)
