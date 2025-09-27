@@ -43,7 +43,7 @@ class TestSimple(unittest.TestCase):
     
     def test_api_endpoint_requires_auth(self):
         """Test that API endpoint requires authentication"""
-        response = self.app.get('/api/data')
+        response = self.app.get('/api/clipboard')
         self.assertEqual(response.status_code, 302)
         self.assertIn('/login', response.location)
     
@@ -72,20 +72,19 @@ class TestSimple(unittest.TestCase):
         
         response = self.app.get('/')
         self.assertEqual(response.status_code, 200)
-        self.assertIn(b'Flask Application', response.data)
-        self.assertIn(b'Welcome to your Flask App!', response.data)
+        self.assertIn(b'CopyPasta', response.data)
+        self.assertIn(b'Cross-device clipboard sharing', response.data)
     
     def test_authenticated_api_endpoint(self):
         """Test API endpoint when authenticated"""
         with self.app.session_transaction() as sess:
             sess['authenticated'] = True
         
-        response = self.app.get('/api/data')
+        response = self.app.get('/api/clipboard')
         self.assertEqual(response.status_code, 200)
         
         data = response.get_json()
         self.assertIsNotNone(data)
-        self.assertIn('message', data)
         self.assertIn('status', data)
         self.assertEqual(data['status'], 'success')
     

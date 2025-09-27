@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Flask App</title>
+    <title>CopyPasta - Cross-Device Clipboard</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -71,63 +71,296 @@
             border-radius: 4px;
             font-family: monospace;
         }
+        .clipboard-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2rem;
+            margin-top: 2rem;
+        }
+        .paste-section, .copy-section {
+            background: #f8f9fa;
+            padding: 1.5rem;
+            border-radius: 8px;
+            border: 1px solid #dee2e6;
+        }
+        .paste-section h3, .copy-section h3 {
+            margin-top: 0;
+            color: #495057;
+        }
+        textarea {
+            width: 100%;
+            min-height: 150px;
+            padding: 0.75rem;
+            border: 1px solid #ced4da;
+            border-radius: 4px;
+            font-family: inherit;
+            resize: vertical;
+            box-sizing: border-box;
+        }
+        .file-input-wrapper {
+            position: relative;
+            display: inline-block;
+            margin-top: 0.5rem;
+        }
+        .file-input {
+            position: absolute;
+            opacity: 0;
+            width: 100%;
+            height: 100%;
+            cursor: pointer;
+        }
+        .file-input-label {
+            display: inline-block;
+            padding: 8px 16px;
+            background: #6c757d;
+            color: white;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .file-input-label:hover {
+            background: #5a6268;
+        }
+        .preview-container {
+            margin-top: 1rem;
+            padding: 1rem;
+            background: white;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            min-height: 100px;
+        }
+        .preview-image {
+            max-width: 100%;
+            max-height: 300px;
+            border-radius: 4px;
+        }
+        .preview-text {
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+        .status-message {
+            margin-top: 1rem;
+            padding: 0.75rem;
+            border-radius: 4px;
+            display: none;
+        }
+        .status-success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .status-error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .timestamp {
+            font-size: 0.875rem;
+            color: #6c757d;
+            margin-top: 0.5rem;
+        }
+        .btn-copy {
+            background: #28a745;
+        }
+        .btn-copy:hover {
+            background: #218838;
+        }
+        @media (max-width: 768px) {
+            .clipboard-container {
+                grid-template-columns: 1fr;
+                gap: 1rem;
+            }
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
-            <h1>Flask Application</h1>
+            <h1>CopyPasta</h1>
             <a href="/logout" class="logout-btn">Logout</a>
         </div>
         
         <div class="content">
-            <h2>Welcome to your Flask App!</h2>
-            <p>This is a template Flask application with authentication, Docker support, and basic infrastructure setup.</p>
+            <p>Cross-device clipboard sharing. Paste content on one device, copy it on another.</p>
             
-            <h3>Features included:</h3>
-            <ul>
-                <li>Session-based authentication</li>
-                <li>Docker containerization</li>
-                <li>Gunicorn production server</li>
-                <li>Health check endpoint</li>
-                <li>Basic API structure</li>
-                <li>GitHub Actions CI/CD ready</li>
-            </ul>
-            
-            <div class="api-demo">
-                <h3>API Demo</h3>
-                <p>Test the sample API endpoint:</p>
-                <button onclick="testApi()">Test API</button>
-                <button onclick="testHealth()">Test Health Check</button>
-                <div id="api-result"></div>
+            <div class="clipboard-container">
+                <div class="paste-section">
+                    <h3>📋 Paste Content</h3>
+                    <textarea id="pasteText" placeholder="Paste your text here..."></textarea>
+                    
+                    <div class="file-input-wrapper">
+                        <label for="imageInput" class="file-input-label">📷 Upload Image</label>
+                        <input type="file" id="imageInput" class="file-input" accept="image/*">
+                    </div>
+                    
+                    <br><br>
+                    <button onclick="pasteContent()">💾 Save to Clipboard</button>
+                    
+                    <div id="pasteStatus" class="status-message"></div>
+                </div>
+                
+                <div class="copy-section">
+                    <h3>📤 Current Clipboard</h3>
+                    <div id="previewContainer" class="preview-container">
+                        <em>No content in clipboard</em>
+                    </div>
+                    
+                    <button class="btn-copy" onclick="copyContent()">📋 Copy to Device</button>
+                    <button onclick="refreshClipboard()">🔄 Refresh</button>
+                    
+                    <div id="copyStatus" class="status-message"></div>
+                    <div id="lastUpdated" class="timestamp"></div>
+                </div>
             </div>
         </div>
     </div>
 
     <script>
-        async function testApi() {
+        let currentClipboard = null;
+
+        // Load clipboard content on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            refreshClipboard();
+            
+            // Handle image file selection
+            document.getElementById('imageInput').addEventListener('change', function(e) {
+                const file = e.target.files[0];
+                if (file && file.type.startsWith('image/')) {
+                    const reader = new FileReader();
+                    reader.onload = function(e) {
+                        pasteContent('image', e.target.result);
+                    };
+                    reader.readAsDataURL(file);
+                }
+            });
+        });
+
+        function showStatus(elementId, message, isError = false) {
+            const element = document.getElementById(elementId);
+            element.textContent = message;
+            element.className = 'status-message ' + (isError ? 'status-error' : 'status-success');
+            element.style.display = 'block';
+            
+            setTimeout(() => {
+                element.style.display = 'none';
+            }, 3000);
+        }
+
+        async function pasteContent(type = null, content = null) {
             try {
-                const response = await fetch('/api/data');
-                const data = await response.json();
-                document.getElementById('api-result').innerHTML = 
-                    '<strong>API Response:</strong><br>' + JSON.stringify(data, null, 2);
+                let contentType = type || 'text';
+                let contentData = content;
+                
+                if (!contentData) {
+                    contentData = document.getElementById('pasteText').value.trim();
+                    if (!contentData) {
+                        showStatus('pasteStatus', 'Please enter some content to paste', true);
+                        return;
+                    }
+                }
+
+                const response = await fetch('/api/paste', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        type: contentType,
+                        content: contentData
+                    })
+                });
+
+                const result = await response.json();
+                
+                if (response.ok) {
+                    showStatus('pasteStatus', 'Content saved to clipboard!');
+                    if (contentType === 'text') {
+                        document.getElementById('pasteText').value = '';
+                    } else {
+                        document.getElementById('imageInput').value = '';
+                    }
+                    await refreshClipboard();
+                } else {
+                    showStatus('pasteStatus', result.error || 'Failed to save content', true);
+                }
             } catch (error) {
-                document.getElementById('api-result').innerHTML = 
-                    '<strong>Error:</strong> ' + error.message;
+                showStatus('pasteStatus', 'Error: ' + error.message, true);
             }
         }
 
-        async function testHealth() {
+        async function refreshClipboard() {
             try {
-                const response = await fetch('/health');
-                const data = await response.json();
-                document.getElementById('api-result').innerHTML = 
-                    '<strong>Health Check:</strong><br>' + JSON.stringify(data, null, 2);
+                const response = await fetch('/api/clipboard');
+                const result = await response.json();
+                
+                if (response.ok && result.data) {
+                    currentClipboard = result.data;
+                    displayClipboard(result.data);
+                    updateTimestamp(result.data.created_at);
+                } else {
+                    currentClipboard = null;
+                    document.getElementById('previewContainer').innerHTML = '<em>No content in clipboard</em>';
+                    document.getElementById('lastUpdated').textContent = '';
+                }
             } catch (error) {
-                document.getElementById('api-result').innerHTML = 
-                    '<strong>Error:</strong> ' + error.message;
+                showStatus('copyStatus', 'Error loading clipboard: ' + error.message, true);
             }
         }
+
+        function displayClipboard(data) {
+            const container = document.getElementById('previewContainer');
+            
+            if (data.content_type === 'image') {
+                container.innerHTML = `<img src="${data.content}" class="preview-image" alt="Clipboard Image">`;
+            } else {
+                const div = document.createElement('div');
+                div.className = 'preview-text';
+                div.textContent = data.content;
+                container.innerHTML = '';
+                container.appendChild(div);
+            }
+        }
+
+        function updateTimestamp(timestamp) {
+            const element = document.getElementById('lastUpdated');
+            const date = new Date(timestamp);
+            element.textContent = 'Last updated: ' + date.toLocaleString();
+        }
+
+        async function copyContent() {
+            if (!currentClipboard) {
+                showStatus('copyStatus', 'No content to copy', true);
+                return;
+            }
+
+            try {
+                if (currentClipboard.content_type === 'image') {
+                    // For images, we can't use the clipboard API directly
+                    // Instead, we'll show instructions to save the image
+                    showStatus('copyStatus', 'Right-click the image and "Save Image" to copy it');
+                } else {
+                    // For text content, use the Clipboard API
+                    if (navigator.clipboard && navigator.clipboard.writeText) {
+                        await navigator.clipboard.writeText(currentClipboard.content);
+                        showStatus('copyStatus', 'Text copied to device clipboard!');
+                    } else {
+                        // Fallback for older browsers
+                        const textArea = document.createElement('textarea');
+                        textArea.value = currentClipboard.content;
+                        document.body.appendChild(textArea);
+                        textArea.select();
+                        document.execCommand('copy');
+                        document.body.removeChild(textArea);
+                        showStatus('copyStatus', 'Text copied to device clipboard!');
+                    }
+                }
+            } catch (error) {
+                showStatus('copyStatus', 'Failed to copy: ' + error.message, true);
+            }
+        }
+
+        // Auto-refresh clipboard every 10 seconds
+        setInterval(refreshClipboard, 10000);
     </script>
 </body>
 </html>

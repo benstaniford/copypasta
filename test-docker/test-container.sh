@@ -185,7 +185,7 @@ if [ "$app_response" = "200" ]; then
     echo -e "${GREEN}✅ Main application page accessible (HTTP $app_response)${NC}"
     
     # Check if page contains expected content
-    if grep -q "Flask Application" app-response.html; then
+    if grep -q "CopyPasta" app-response.html; then
         echo -e "${GREEN}   Page contains expected application content${NC}"
     else
         echo -e "${YELLOW}   Warning: Page may not contain expected content${NC}"

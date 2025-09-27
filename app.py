@@ -1,6 +1,11 @@
 from flask import Flask, render_template, jsonify, request, session, redirect, url_for
 import os
 from functools import wraps
+import base64
+from datetime import datetime, timedelta
+from database import init_db, save_clipboard_entry, get_clipboard_entry
+from PIL import Image
+import io
 
 app = Flask(__name__)
 
@@ -8,6 +13,12 @@ app = Flask(__name__)
 USERNAME = os.environ.get('APP_USERNAME', 'user')
 PASSWORD = os.environ.get('APP_PASSWORD', 'password')
 app.secret_key = os.environ.get('SECRET_KEY', 'your-secret-key-change-this-in-production')
+
+# Configure session to be permanent and last forever
+app.permanent_session_lifetime = timedelta(days=365 * 10)  # 10 years
+
+# Initialize database on startup
+init_db()
 
 def login_required(f):
     """Decorator to require authentication for routes"""
@@ -27,6 +38,7 @@ def login():
         password = request.form.get('password')
         
         if username == USERNAME and password == PASSWORD:
+            session.permanent = True
             session['authenticated'] = True
             next_page = request.args.get('next')
             return redirect(next_page) if next_page else redirect(url_for('index'))
@@ -47,12 +59,78 @@ def index():
     """Main page"""
     return render_template('index.html')
 
+@app.route('/api/paste', methods=['POST'])
+@login_required
+def paste():
+    """Save content to clipboard"""
+    try:
+        data = request.get_json()
+        content_type = data.get('type', 'text')
+        content = data.get('content', '')
+        
+        if not content:
+            return jsonify({'error': 'No content provided'}), 400
+        
+        # Handle different content types
+        if content_type == 'image':
+            # Validate base64 image data
+            try:
+                if content.startswith('data:image/'):
+                    header, base64_data = content.split(',', 1)
+                else:
+                    base64_data = content
+                
+                # Try to decode and validate the image
+                image_data = base64.b64decode(base64_data)
+                img = Image.open(io.BytesIO(image_data))
+                img.verify()  # Verify it's a valid image
+                
+            except Exception as e:
+                return jsonify({'error': 'Invalid image data'}), 400
+        
+        # Save to database
+        metadata = {
+            'timestamp': datetime.now().isoformat(),
+            'user_agent': request.headers.get('User-Agent', '')
+        }
+        
+        save_clipboard_entry(content_type, content, str(metadata))
+        
+        return jsonify({
+            'status': 'success',
+            'message': 'Content saved to clipboard',
+            'timestamp': datetime.now().isoformat()
+        })
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/clipboard')
+@login_required
+def get_clipboard():
+    """Get current clipboard content"""
+    try:
+        entry = get_clipboard_entry()
+        if entry:
+            return jsonify({
+                'status': 'success',
+                'data': entry
+            })
+        else:
+            return jsonify({
+                'status': 'success',
+                'data': None,
+                'message': 'No clipboard content found'
+            })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 @app.route('/api/data')
 @login_required
 def api_data():
-    """Sample API endpoint"""
+    """Sample API endpoint for backward compatibility"""
     return jsonify({
-        'message': 'Hello from the API!',
+        'message': 'CopyPasta API is running!',
         'status': 'success'
     })
 
