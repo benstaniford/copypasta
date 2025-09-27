@@ -12,6 +12,50 @@ on:
         type: string
 
 jobs:
+  build-linux-cli:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential debhelper dh-python python3-all python3-setuptools python3-requests
+
+      - name: Extract version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "VERSION=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+          else
+            echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+          fi
+          NUMERIC_VERSION=$(echo "${{ github.event_name == 'workflow_dispatch' && github.event.inputs.version || github.ref_name }}" | sed 's/^v//')
+          echo "NUMERIC_VERSION=$NUMERIC_VERSION" >> $GITHUB_OUTPUT
+
+      - name: Update version in setup.py
+        run: |
+          cd linux-cli
+          sed -i 's/version="1.0.0"/version="${{ steps.version.outputs.NUMERIC_VERSION }}"/' setup.py
+
+      - name: Build Debian package
+        run: |
+          cd linux-cli
+          chmod +x build-deb.sh
+          ./build-deb.sh
+
+      - name: Upload Linux CLI artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: copyp-deb
+          path: copyp_*.deb
+
   build-docker:
     runs-on: ubuntu-latest
     steps:
@@ -64,7 +108,7 @@ jobs:
 
 
   create-release:
-    needs: [build-docker]
+    needs: [build-linux-cli, build-docker]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -96,12 +140,16 @@ jobs:
           
           ## Downloads
           
+          ### Linux CLI
+          - **copyp_${{ steps.version.outputs.NUMERIC_VERSION }}-1_all.deb** - Debian package for Linux CLI tool
+          
           ### Docker
           - **copypasta-docker-${{ steps.version.outputs.VERSION }}.tar.gz** - Docker image
           
           ## Features
           
           - 🌐 **Web Interface**: Access clipboard from any device with a web browser
+          - 🖥️ **Linux CLI Tool**: Command-line interface for seamless clipboard sharing
           - 📝 **Text Support**: Share text content across devices
           - 🖼️ **Image Support**: Copy and paste images across devices
           - 🔒 **Authentication**: Secure login system
@@ -109,6 +157,22 @@ jobs:
           - 💾 **SQLite Database**: Persistent clipboard storage
           
           ## Installation
+          
+          ### Linux CLI Tool
+          ```bash
+          # Install the Debian package
+          sudo dpkg -i copyp_${{ steps.version.outputs.NUMERIC_VERSION }}-1_all.deb
+          sudo apt-get install -f  # Install dependencies if needed
+          
+          # First run - configure your server
+          copyp
+          
+          # Copy text to clipboard
+          echo "Hello World" | copyp
+          
+          # Paste from clipboard
+          copyp
+          ```
           
           ### Server (Docker)
           
@@ -133,6 +197,7 @@ jobs:
           ## System Requirements
           
           - **Server**: Docker or Python 3.11+
+          - **Linux CLI**: Python 3.8+ (included with most Linux distributions)
           
           EOF
 
@@ -160,6 +225,18 @@ jobs:
             --latest
           
           echo "✓ GitHub release created successfully"
+
+      - name: Upload Linux CLI Package
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION="${{ steps.version.outputs.VERSION }}"
+          NUMERIC_VERSION="${{ steps.version.outputs.NUMERIC_VERSION }}"
+          CLI_ASSET="artifacts/copyp-deb/copyp_${NUMERIC_VERSION}-1_all.deb"
+          
+          echo "Uploading Linux CLI package to release..."
+          gh release upload "$VERSION" "$CLI_ASSET" --clobber
+          echo "✓ Linux CLI package uploaded successfully"
 
       - name: Upload Docker Image
         env:
