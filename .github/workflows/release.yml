@@ -11,7 +11,57 @@ on:
         required: true
         type: string
 
+permissions:
+  contents: write
+  actions: read
+  packages: write
+
 jobs:
+  build-linux-cli:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential debhelper dh-python python3-all python3-setuptools python3-requests
+
+      - name: Extract version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "VERSION=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+          else
+            echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+          fi
+          NUMERIC_VERSION=$(echo "${{ github.event_name == 'workflow_dispatch' && github.event.inputs.version || github.ref_name }}" | sed 's/^v//')
+          echo "NUMERIC_VERSION=$NUMERIC_VERSION" >> $GITHUB_OUTPUT
+
+      - name: Update version in setup.py and changelog
+        run: |
+          cd linux-cli
+          sed -i 's/version="1.0.0"/version="${{ steps.version.outputs.NUMERIC_VERSION }}"/' setup.py
+          sed -i '1s/copyp (1.0.0-1)/copyp (${{ steps.version.outputs.NUMERIC_VERSION }}-1)/' debian/changelog
+
+      - name: Build Debian package
+        run: |
+          cd linux-cli
+          chmod +x build-deb.sh
+          ./build-deb.sh
+
+      - name: Upload Linux CLI artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: copyp-deb
+          path: copyp_*.deb
+
   build-docker:
     runs-on: ubuntu-latest
     steps:
@@ -62,208 +112,9 @@ jobs:
           name: copypasta-docker
           path: copypasta-docker-${{ steps.version.outputs.VERSION }}.tar.gz
 
-  build-windows:
-    runs-on: windows-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Setup .NET
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: '6.0.x'
-
-      - name: Setup MSBuild
-        uses: microsoft/setup-msbuild@v1.3
-
-      - name: Verify MSBuild
-        run: |
-          Write-Host "MSBuild version:"
-          msbuild -version
-          Write-Host "MSBuild path:"
-          Get-Command msbuild | Select-Object -ExpandProperty Source
-        shell: powershell
-
-      - name: Setup WiX Toolset
-        run: |
-          # Use chocolatey to install WiX (more reliable than direct download)
-          Write-Host "Installing WiX Toolset via Chocolatey..."
-          choco install wixtoolset -y --version 3.14.0
-          
-          # Verify installation
-          $wixPath = "C:\Program Files (x86)\WiX Toolset v3.14\bin"
-          if (Test-Path $wixPath) {
-            Write-Host "✅ WiX Toolset installed successfully at $wixPath"
-            # Add to PATH
-            $env:PATH += ";$wixPath"
-            echo $wixPath | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
-            
-            # Verify tools
-            if (Test-Path "$wixPath\candle.exe") {
-              Write-Host "✅ candle.exe found"
-              & "$wixPath\candle.exe" -?
-            }
-            if (Test-Path "$wixPath\light.exe") {
-              Write-Host "✅ light.exe found"
-            }
-          } else {
-            Write-Error "❌ WiX installation failed"
-            Write-Host "Available WiX directories:"
-            Get-ChildItem "C:\Program Files (x86)" | Where-Object { $_.Name -like "*WiX*" }
-            exit 1
-          }
-        shell: powershell
-
-      - name: Extract version
-        id: version
-        run: |
-          if ("${{ github.event_name }}" -eq "workflow_dispatch") {
-            $version = "${{ github.event.inputs.version }}"
-          } else {
-            $version = "${{ github.ref }}" -replace "refs/tags/", ""
-          }
-          echo "VERSION=$version" >> $env:GITHUB_OUTPUT
-          
-          # Extract numeric version (remove 'v' prefix if present)
-          $numericVersion = $version -replace "^v", ""
-          echo "NUMERIC_VERSION=$numericVersion" >> $env:GITHUB_OUTPUT
-        shell: powershell
-
-      - name: Restore dependencies
-        run: |
-          # Only restore the main C# project, not the WiX project
-          dotnet restore win-copypasta/CopyPasta.csproj
-          
-          # Also try to restore NuGet packages for WiX if available
-          if (Test-Path "win-copypasta/CopyPasta.Installer/packages.config") {
-            Write-Host "Restoring NuGet packages for WiX project..."
-            nuget restore win-copypasta/CopyPasta.Installer/packages.config -PackagesDirectory win-copypasta/packages
-          }
-        shell: powershell
-
-      - name: Update version in project files
-        run: |
-          # Update version in .csproj
-          $csprojPath = "win-copypasta/CopyPasta.csproj"
-          $content = Get-Content $csprojPath -Raw
-          $content = $content -replace "<AssemblyVersion>.*</AssemblyVersion>", "<AssemblyVersion>${{ steps.version.outputs.NUMERIC_VERSION }}</AssemblyVersion>"
-          $content = $content -replace "<FileVersion>.*</FileVersion>", "<FileVersion>${{ steps.version.outputs.NUMERIC_VERSION }}</FileVersion>"
-          Set-Content $csprojPath $content
-          
-          # Update version in WiX project
-          $wixPath = "win-copypasta/CopyPasta.Installer/Product.wxs"
-          $content = Get-Content $wixPath -Raw
-          $content = $content -replace 'Version="[^"]*"', 'Version="${{ steps.version.outputs.NUMERIC_VERSION }}"'
-          Set-Content $wixPath $content
-        shell: powershell
-
-      - name: Build application
-        run: dotnet build win-copypasta/CopyPasta.csproj --configuration Release --no-restore
-
-      - name: Build installer
-        run: |
-          # Find WiX installation directory
-          Write-Host "Searching for WiX installation..."
-          
-          $wixPaths = @(
-            "C:\Program Files (x86)\WiX Toolset v3.14",
-            "C:\Program Files\WiX Toolset v3.14", 
-            "C:\Program Files (x86)\WiX Toolset v3.11",
-            "C:\Program Files\WiX Toolset v3.11"
-          )
-          
-          $wixInstallPath = $null
-          foreach ($path in $wixPaths) {
-            if (Test-Path $path) {
-              $wixInstallPath = $path
-              Write-Host "✅ Found WiX at: $path"
-              break
-            }
-          }
-          
-          if (-not $wixInstallPath) {
-            Write-Host "❌ WiX not found in expected locations. Searching all Program Files..."
-            Get-ChildItem "C:\Program Files (x86)" | Where-Object { $_.Name -like "*WiX*" } | ForEach-Object { Write-Host "Found: $($_.FullName)" }
-            Get-ChildItem "C:\Program Files" | Where-Object { $_.Name -like "*WiX*" } | ForEach-Object { Write-Host "Found: $($_.FullName)" }
-            
-            # Try chocolatey install location
-            $chocoWixPath = "C:\ProgramData\chocolatey\lib\wixtoolset\tools"
-            if (Test-Path $chocoWixPath) {
-              $wixInstallPath = $chocoWixPath
-              Write-Host "✅ Found WiX via Chocolatey at: $chocoWixPath"
-            } else {
-              Write-Error "WiX Toolset installation not found"
-              exit 1
-            }
-          }
-          
-          # Set WiX environment variables
-          $wixBinPath = Join-Path $wixInstallPath "bin"
-          $env:WIX = $wixInstallPath
-          $env:PATH = "$wixBinPath;$env:PATH"
-          
-          Write-Host "WIX environment variable set to: $env:WIX"
-          Write-Host "WiX bin path added to PATH: $wixBinPath"
-          
-          # Verify WiX tools are available
-          $candlePath = Join-Path $wixBinPath "candle.exe"
-          $lightPath = Join-Path $wixBinPath "light.exe"
-          
-          if (Test-Path $candlePath) {
-            Write-Host "✅ candle.exe found at: $candlePath"
-          } else {
-            Write-Error "candle.exe not found at: $candlePath"
-            exit 1
-          }
-          
-          if (Test-Path $lightPath) {
-            Write-Host "✅ light.exe found at: $lightPath"
-          } else {
-            Write-Error "light.exe not found at: $lightPath"
-            exit 1
-          }
-          
-          # Build the installer using MSBuild with WiX environment
-          Write-Host "Building WiX installer project..."
-          msbuild win-copypasta/CopyPasta.Installer/CopyPasta.Installer.wixproj /p:Configuration=Release /p:Platform=x86 /verbosity:minimal
-        shell: powershell
-
-      - name: Sign installer (if certificate available)
-        if: env.SIGNING_CERT != ''
-        run: |
-          # This would sign the installer if a certificate is available
-          # signtool sign /f certificate.p12 /p password /t http://timestamp.sectigo.com win-copypasta/CopyPasta.Installer/bin/Release/CopyPasta-Setup.msi
-          echo "Code signing certificate not configured"
-        env:
-          SIGNING_CERT: ${{ secrets.SIGNING_CERT }}
-        shell: powershell
-
-      - name: Rename installer
-        run: |
-          $version = "${{ steps.version.outputs.VERSION }}"
-          Move-Item "win-copypasta/CopyPasta.Installer/bin/Release/CopyPasta-Setup.msi" "CopyPasta-Setup-$version.msi"
-        shell: powershell
-
-      - name: Upload Windows installer artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: copypasta-windows-installer
-          path: CopyPasta-Setup-${{ steps.version.outputs.VERSION }}.msi
-
-      - name: Build portable executable
-        run: |
-          dotnet publish win-copypasta/CopyPasta.csproj --configuration Release --runtime win-x64 --self-contained true -p:PublishSingleFile=true --output portable/
-          Compress-Archive -Path portable/CopyPasta.exe -DestinationPath CopyPasta-Portable-${{ steps.version.outputs.VERSION }}.zip
-        shell: powershell
-
-      - name: Upload portable artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: copypasta-windows-portable
-          path: CopyPasta-Portable-${{ steps.version.outputs.VERSION }}.zip
 
   create-release:
-    needs: [build-docker, build-windows]
+    needs: [build-linux-cli, build-docker]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -277,6 +128,8 @@ jobs:
           else
             echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
           fi
+          NUMERIC_VERSION=$(echo "${{ github.event_name == 'workflow_dispatch' && github.event.inputs.version || github.ref_name }}" | sed 's/^v//')
+          echo "NUMERIC_VERSION=$NUMERIC_VERSION" >> $GITHUB_OUTPUT
 
       - name: Download all artifacts
         uses: actions/download-artifact@v4
@@ -291,32 +144,43 @@ jobs:
           
           ## What's New
           
-          Cross-device clipboard sharing with automatic content detection and rich text support.
+          Cross-device clipboard sharing application built with Flask.
           
           ## Downloads
           
-          ### Windows
-          - **CopyPasta-Setup-${{ steps.version.outputs.VERSION }}.msi** - Windows installer (recommended)
-          - **CopyPasta-Portable-${{ steps.version.outputs.VERSION }}.zip** - Portable executable
+          ### Linux CLI
+          - **copyp_${{ steps.version.outputs.NUMERIC_VERSION }}-1_all.deb** - Debian package for Linux CLI tool
           
           ### Docker
           - **copypasta-docker-${{ steps.version.outputs.VERSION }}.tar.gz** - Docker image
           
           ## Features
           
-          - 🖥️ **Windows Tray Application**: Automatic clipboard monitoring and sync
           - 🌐 **Web Interface**: Access clipboard from any device with a web browser
-          - 📝 **Rich Text Support**: Preserves formatting in copied text
+          - 🖥️ **Linux CLI Tool**: Command-line interface for seamless clipboard sharing
+          - 📝 **Text Support**: Share text content across devices
           - 🖼️ **Image Support**: Copy and paste images across devices
           - 🔒 **Authentication**: Secure login system
           - 🐳 **Docker Deployment**: Easy server setup with Docker
+          - 💾 **SQLite Database**: Persistent clipboard storage
           
           ## Installation
           
-          ### Windows Client
-          1. Download and run `CopyPasta-Setup-${{ steps.version.outputs.VERSION }}.msi`
-          2. Configure server endpoint and credentials
-          3. Start copying content between devices!
+          ### Linux CLI Tool
+          ```bash
+          # Install the Debian package
+          sudo dpkg -i copyp_${{ steps.version.outputs.NUMERIC_VERSION }}-1_all.deb
+          sudo apt-get install -f  # Install dependencies if needed
+          
+          # First run - configure your server
+          copyp
+          
+          # Copy text to clipboard
+          echo "Hello World" | copyp
+          
+          # Paste from clipboard
+          copyp
+          ```
           
           ### Server (Docker)
           
@@ -340,49 +204,53 @@ jobs:
           
           ## System Requirements
           
-          - **Windows Client**: Windows 10 or later, .NET 6.0 Runtime
           - **Server**: Docker or Python 3.11+
+          - **Linux CLI**: Python 3.8+ (included with most Linux distributions)
           
           EOF
 
       - name: Create GitHub Release
-        id: create_release
-        uses: actions/create-release@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tag_name: ${{ steps.version.outputs.VERSION }}
-          release_name: CopyPasta ${{ steps.version.outputs.VERSION }}
-          body_path: release_notes.md
-          draft: false
-          prerelease: false
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION="${{ steps.version.outputs.VERSION }}"
+          
+          echo "Creating release for tag: $VERSION"
+          
+          # Check if release already exists
+          if gh release view "$VERSION" >/dev/null 2>&1; then
+            echo "Release $VERSION already exists, will add artifacts to it..."
+          else
+            # Create the release
+            echo "Creating GitHub release..."
+            gh release create "$VERSION" \
+              --title "CopyPasta $VERSION" \
+              --notes-file "release_notes.md" \
+              --latest
+          fi
+          
+          echo "✓ GitHub release created successfully"
 
-      - name: Upload Windows Installer
-        uses: actions/upload-release-asset@v1
+      - name: Upload Linux CLI Package
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: artifacts/copypasta-windows-installer/CopyPasta-Setup-${{ steps.version.outputs.VERSION }}.msi
-          asset_name: CopyPasta-Setup-${{ steps.version.outputs.VERSION }}.msi
-          asset_content_type: application/x-msi
-
-      - name: Upload Windows Portable
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: artifacts/copypasta-windows-portable/CopyPasta-Portable-${{ steps.version.outputs.VERSION }}.zip
-          asset_name: CopyPasta-Portable-${{ steps.version.outputs.VERSION }}.zip
-          asset_content_type: application/zip
+        run: |
+          VERSION="${{ steps.version.outputs.VERSION }}"
+          NUMERIC_VERSION="${{ steps.version.outputs.NUMERIC_VERSION }}"
+          CLI_ASSET="artifacts/copyp-deb/copyp_${NUMERIC_VERSION}-1_all.deb"
+          
+          echo "Uploading Linux CLI package to release..."
+          gh release upload "$VERSION" "$CLI_ASSET" --clobber
+          echo "✓ Linux CLI package uploaded successfully"
 
       - name: Upload Docker Image
-        uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: artifacts/copypasta-docker/copypasta-docker-${{ steps.version.outputs.VERSION }}.tar.gz
-          asset_name: copypasta-docker-${{ steps.version.outputs.VERSION }}.tar.gz
-          asset_content_type: application/gzip
+        run: |
+          VERSION="${{ steps.version.outputs.VERSION }}"
+          DOCKER_ASSET="artifacts/copypasta-docker/copypasta-docker-$VERSION.tar.gz"
+          
+          echo "Uploading Docker image to release..."
+          gh release upload "$VERSION" "$DOCKER_ASSET" --clobber
+          echo "✓ Docker image uploaded successfully"
