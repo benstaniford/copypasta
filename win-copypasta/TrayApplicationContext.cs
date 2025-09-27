@@ -35,7 +35,24 @@ namespace CopyPasta
 
         private Icon CreateIcon()
         {
-            // Create a simple icon programmatically
+            // Load the icon from embedded resources
+            try
+            {
+                var assembly = System.Reflection.Assembly.GetExecutingAssembly();
+                using (var stream = assembly.GetManifestResourceStream("CopyPasta.icon.ico"))
+                {
+                    if (stream != null)
+                    {
+                        return new Icon(stream);
+                    }
+                }
+            }
+            catch
+            {
+                // Fall back to programmatic icon if embedded resource fails
+            }
+
+            // Fallback: Create a simple icon programmatically
             var bitmap = new Bitmap(16, 16);
             using (var g = Graphics.FromImage(bitmap))
             {
