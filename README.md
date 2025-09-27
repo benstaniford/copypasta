@@ -1,39 +1,41 @@
-# Flask Application Template
+# CopyPasta 📋
 
-A production-ready Flask application template with authentication, Docker support, and CI/CD infrastructure. This template provides a solid foundation for building web applications with modern deployment practices.
+A cross-device clipboard sharing application built with Flask. Share text and images seamlessly between your devices through a simple web interface.
 
 ## ✨ Features
 
-- **Session-based Authentication**: Secure login system with configurable credentials
-- **Docker Support**: Multi-stage Docker build for production deployment
-- **Production Ready**: Gunicorn WSGI server with optimized configuration
-- **Health Checks**: Built-in health endpoint for container orchestration
-- **CI/CD Ready**: GitHub Actions workflow templates included
-- **Testing Framework**: Unit tests and Docker container validation
-- **Security**: Non-root container execution, secure session management
+- **Cross-Device Clipboard**: Share content between phones, tablets, computers, and any device with a web browser
+- **Multi-Content Support**: Text, rich text, and images (PNG, JPG, GIF, etc.)
+- **Real-Time Sync**: Auto-refresh every 10 seconds to keep all devices in sync
+- **One-Click Copy**: Copy shared content directly to your device's clipboard
+- **Persistent Login**: Stay logged in until you explicitly sign out
+- **Secure Storage**: SQLite database with metadata tracking
+- **Production Ready**: Docker deployment with Gunicorn WSGI server
+- **Mobile Friendly**: Responsive design works on all screen sizes
 
 ## 🚀 Quick Start
 
 ### Prerequisites
 - Docker and Docker Compose
-- Python 3.11+ (for local development)
+- Any modern web browser
 
 ### Using Docker (Recommended)
 
 1. **Clone the repository**
    ```bash
    git clone <your-repo-url>
-   cd flask-app-template
+   cd copypasta
    ```
 
 2. **Start the application**
    ```bash
-   docker-compose up --build -d
+   docker compose up --build -d
    ```
 
 3. **Access the application**
    - Open your browser to `http://localhost:5000`
    - Login with default credentials: `user` / `password`
+   - Start sharing content between your devices!
 
 ### Local Development
 
@@ -46,6 +48,19 @@ A production-ready Flask application template with authentication, Docker suppor
    ```bash
    python app.py
    ```
+
+## 📱 How to Use
+
+1. **Login** on any device using your credentials
+2. **Paste Content**: 
+   - Type or paste text in the text area
+   - OR upload an image using the file picker
+   - Click "Save to Clipboard"
+3. **Copy on Another Device**:
+   - Open CopyPasta on any other device
+   - View the preview of your shared content
+   - Click "Copy to Device" for text content
+   - Right-click and save images
 
 ## ⚙️ Configuration
 
@@ -68,25 +83,48 @@ environment:
 
 ## 🔧 API Endpoints
 
-- `GET /` - Main application page (requires authentication)
+### Web Interface
+- `GET /` - Main clipboard interface (requires authentication)
 - `GET /login` - Login page
 - `POST /login` - Authentication endpoint
 - `GET /logout` - Logout endpoint
+
+### API Endpoints
 - `GET /health` - Health check endpoint
-- `GET /api/data` - Sample API endpoint (requires authentication)
+- `GET /api/clipboard` - Get current clipboard content
+- `POST /api/paste` - Save new content to clipboard
+- `GET /api/data` - Legacy API endpoint for compatibility
+
+### API Usage Examples
+
+**Get clipboard content:**
+```bash
+curl -H "Cookie: session=..." http://localhost:5000/api/clipboard
+```
+
+**Save text content:**
+```bash
+curl -X POST \
+  -H "Content-Type: application/json" \
+  -H "Cookie: session=..." \
+  -d '{"type":"text","content":"Hello from API!"}' \
+  http://localhost:5000/api/paste
+```
 
 ## 🐳 Docker Details
 
 ### Multi-Stage Build
-- **Builder stage**: Compiles dependencies with build tools
-- **Runtime stage**: Minimal production image (~150MB)
+- **Builder stage**: Compiles Python packages including Pillow for image processing
+- **Runtime stage**: Minimal production image with SQLite database
 - **Base**: Python 3.11 slim for security and size optimization
 
-### Security Features
-- Non-root user execution
-- Read-only filesystem where possible
-- Minimal attack surface
-- Secure session management
+### Persistent Data
+- SQLite database stored in container at `/app/clipboard.db`
+- Mount a volume to persist data across container restarts:
+  ```yaml
+  volumes:
+    - ./data:/app/data
+  ```
 
 ## 🧪 Testing
 
@@ -111,51 +149,95 @@ python tests/test_imports.py
 
 ```
 ├── app.py                 # Main Flask application
-├── requirements.txt       # Python dependencies
+├── database.py           # SQLite database operations
+├── requirements.txt       # Python dependencies (Flask, Pillow, etc.)
 ├── Dockerfile            # Multi-stage Docker build
 ├── docker-compose.yml    # Development compose file
 ├── gunicorn.conf.py      # Production server configuration
 ├── templates/            # HTML templates
-│   ├── index.html       # Main page
+│   ├── index.html       # Main clipboard interface
 │   └── login.html       # Login page
 ├── tests/               # Test suite
 ├── scripts/             # Automation scripts
-└── test-docker/         # Container testing
+├── test-docker/         # Container testing
+└── clipboard.db         # SQLite database (created at runtime)
 ```
 
 ## 🚀 Deployment
 
 ### Production Deployment
-1. Set secure environment variables
-2. Use Docker Compose or container orchestration
-3. Configure reverse proxy (nginx, traefik, etc.)
-4. Set up SSL certificates
+1. **Set secure credentials**
+   ```bash
+   export APP_USERNAME="your-secure-username"
+   export APP_PASSWORD="your-secure-password"
+   export SECRET_KEY="your-very-long-random-secret-key"
+   ```
 
-### Environment Variables for Production
-```bash
-export APP_USERNAME="your-secure-username"
-export APP_PASSWORD="your-secure-password"
-export SECRET_KEY="your-very-long-random-secret-key"
+2. **Deploy with Docker Compose**
+   ```bash
+   docker compose -f docker-compose.prod.yml up -d
+   ```
+
+3. **Configure reverse proxy** (nginx, traefik, etc.)
+4. **Set up SSL certificates** for HTTPS access
+
+### Network Access
+For cross-device access, ensure the application is accessible on your local network:
+```yaml
+ports:
+  - "0.0.0.0:5000:5000"  # Allow access from other devices
 ```
 
-## 🔒 Security Best Practices
+Then access from other devices using your computer's IP: `http://YOUR-IP:5000`
 
-- Change default credentials before deployment
-- Use a strong, random secret key
-- Deploy behind HTTPS
-- Regularly update dependencies
-- Monitor container logs
+## 🔒 Security Considerations
 
-## 🆘 Support
+- **Change default credentials** before exposing to network
+- **Use HTTPS** in production to protect login credentials
+- **Firewall access** if deploying on public networks
+- **Regular backups** of clipboard.db if storing important content
+- **Monitor access logs** for unauthorized usage
 
-This template provides a solid foundation for Flask applications. Customize it according to your specific needs:
+## 💡 Use Cases
 
-1. Add your application logic to `app.py`
-2. Update templates in `templates/`
-3. Add additional routes and functionality
-4. Extend the test suite
-5. Configure deployment for your environment
+- **Developer Workflow**: Share code snippets between development machine and testing devices
+- **Content Creation**: Move text drafts between phone and computer
+- **Image Sharing**: Quick photo sharing between devices without cloud services
+- **Meeting Notes**: Share meeting links or notes between laptop and phone
+- **Cross-Platform**: Bridge content between iOS, Android, Windows, Mac, Linux
+
+## 🆘 Troubleshooting
+
+### Common Issues
+
+**Can't access from other devices:**
+- Check firewall settings
+- Ensure port 5000 is open
+- Use correct IP address (not localhost)
+
+**Images not displaying:**
+- Check image file size (large files may take time)
+- Ensure valid image format (PNG, JPG, GIF)
+- Check browser console for errors
+
+**Login issues:**
+- Verify credentials in environment variables
+- Clear browser cookies and try again
+- Check container logs: `docker compose logs flask-app`
+
+### Development
+
+```bash
+# View application logs
+docker compose logs -f flask-app
+
+# Access container shell
+docker compose exec flask-app sh
+
+# Test database connection
+python -c "from database import get_clipboard_entry; print(get_clipboard_entry())"
+```
 
 ## 📝 License
 
-This template is provided as-is for educational and development purposes.
+This project is provided as-is for personal and educational use. Feel free to modify and adapt for your needs.
