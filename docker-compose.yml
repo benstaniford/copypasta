@@ -1,7 +1,7 @@
 services:
-  flask-app:
+  copypasta:
     build: .
-    container_name: flask-app
+    container_name: copypasta
     ports:
       - "5000:5000"
     restart: unless-stopped

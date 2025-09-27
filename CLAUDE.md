@@ -17,7 +17,7 @@ docker compose up --build -d
 docker compose down
 
 # View application logs
-docker compose logs -f flask-app
+docker compose logs -f copypasta
 ```
 
 ### Testing
