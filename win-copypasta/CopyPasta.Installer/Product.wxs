@@ -1,0 +1,91 @@
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
+  <Product Id="*" Name="CopyPasta" Language="1033" Version="1.0.0.0" Manufacturer="CopyPasta Team" UpgradeCode="F1E2D3C4-B5A6-7890-CDEF-123456789ABC">
+    <Package InstallerVersion="200" Compressed="yes" InstallScope="perMachine" />
+
+    <MajorUpgrade DowngradeErrorMessage="A newer version of [ProductName] is already installed." 
+                  AllowSameVersionUpgrades="no" 
+                  Schedule="afterInstallInitialize" 
+                  MigrateFeatures="yes" />
+    <MediaTemplate EmbedCab="yes" />
+
+    <!-- Custom actions to kill existing processes -->
+    <CustomAction Id="KillCopyPasta" 
+                  Directory="SystemFolder" 
+                  ExeCommand='taskkill /F /IM CopyPasta.exe /T' 
+                  Execute="immediate" 
+                  Return="ignore" />
+    
+    <!-- Custom action to start application after installation -->
+    <CustomAction Id="StartCopyPasta" 
+                  Directory="INSTALLFOLDER" 
+                  ExeCommand="CopyPasta.exe" 
+                  Execute="commit" 
+                  Return="asyncNoWait" 
+                  Impersonate="yes" />
+
+    <Feature Id="ProductFeature" Title="CopyPasta" Level="1">
+      <ComponentGroupRef Id="ProductComponents" />
+      <ComponentRef Id="ApplicationShortcut" />
+      <ComponentRef Id="ApplicationRegistryEntries" />
+      <ComponentRef Id="PathEnvironmentVariable" />
+    </Feature>
+
+    <Directory Id="TARGETDIR" Name="SourceDir">
+      <Directory Id="SystemFolder" />
+      <Directory Id="ProgramFilesFolder">
+        <Directory Id="INSTALLFOLDER" Name="CopyPasta">
+          <Component Id="ApplicationShortcut" Guid="*">
+            <Shortcut Id="ApplicationStartMenuShortcut"
+                      Name="CopyPasta"
+                      Description="Cross-device clipboard sharing application"
+                      Target="[INSTALLFOLDER]CopyPasta.exe"
+                      WorkingDirectory="INSTALLFOLDER"
+                      Directory="ProgramMenuFolder" />
+            <RemoveFolder Id="INSTALLFOLDER" On="uninstall" />
+            <RegistryValue Root="HKCU" Key="Software\Microsoft\CopyPasta" Name="installed" Type="integer" Value="1" KeyPath="yes" />
+          </Component>
+          <Component Id="ApplicationRegistryEntries" Guid="*">
+            <RegistryKey Root="HKLM" Key="SOFTWARE\Microsoft\Windows\CurrentVersion\Run">
+              <RegistryValue Name="CopyPasta" Type="string" Value="[INSTALLFOLDER]CopyPasta.exe" />
+            </RegistryKey>
+          </Component>
+          <Component Id="PathEnvironmentVariable" Guid="*">
+            <Environment Id="PATH" Name="PATH" Value="[INSTALLFOLDER]" Permanent="no" Part="last" Action="set" System="yes" />
+            <RegistryValue Root="HKCU" Key="Software\Microsoft\CopyPasta" Name="PathAdded" Type="integer" Value="1" KeyPath="yes" />
+          </Component>
+        </Directory>
+      </Directory>
+      <Directory Id="ProgramMenuFolder" />
+    </Directory>
+
+    <ComponentGroup Id="ProductComponents" Directory="INSTALLFOLDER">
+      <Component Id="CopyPasta.exe" Guid="*">
+        <File Id="CopyPasta.exe" Source="$(var.CopyPasta.TargetPath)" />
+      </Component>
+      <Component Id="CopyPasta.deps.json" Guid="*">
+        <File Id="CopyPasta.deps.json" Source="$(var.CopyPasta.TargetDir)CopyPasta.deps.json" />
+      </Component>
+      <Component Id="CopyPasta.runtimeconfig.json" Guid="*">
+        <File Id="CopyPasta.runtimeconfig.json" Source="$(var.CopyPasta.TargetDir)CopyPasta.runtimeconfig.json" />
+      </Component>
+      <Component Id="CopyPasta.dll" Guid="*">
+        <File Id="CopyPasta.dll" Source="$(var.CopyPasta.TargetDir)CopyPasta.dll" />
+      </Component>
+      <Component Id="Newtonsoft.Json.dll" Guid="*">
+        <File Id="Newtonsoft.Json.dll" Source="$(var.CopyPasta.TargetDir)Newtonsoft.Json.dll" />
+      </Component>
+    </ComponentGroup>
+
+    <!-- Installation sequence -->
+    <InstallExecuteSequence>
+      <Custom Action="KillCopyPasta" Before="InstallValidate">NOT Installed</Custom>
+      <Custom Action="StartCopyPasta" Before="InstallFinalize">NOT Installed</Custom>
+    </InstallExecuteSequence>
+
+    <UI>
+      <UIRef Id="WixUI_Minimal" />
+    </UI>
+
+    <Property Id="WIXUI_INSTALLDIR" Value="INSTALLFOLDER" />
+  </Product>
+</Wix>

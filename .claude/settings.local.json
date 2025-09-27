@@ -18,7 +18,10 @@
       "Read(//home/ben/Code/remote-control/**)",
       "Read(//home/ben/Code/remote-control/**)",
       "WebSearch",
-      "WebFetch(domain:github.com)"
+      "WebFetch(domain:github.com)",
+      "Read(//home/ben/Code/remote-control/**)",
+      "Read(//home/ben/Code/remote-control/**)",
+      "Bash(mkdir:*)"
     ],
     "deny": [],
     "ask": []
