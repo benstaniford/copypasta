@@ -67,6 +67,7 @@ def paste():
         data = request.get_json()
         content_type = data.get('type', 'text')
         content = data.get('content', '')
+        client_id = data.get('client_id', None)
         
         if not content:
             return jsonify({'error': 'No content provided'}), 400
@@ -104,7 +105,7 @@ def paste():
             'user_agent': request.headers.get('User-Agent', '')
         }
         
-        save_clipboard_entry(content_type, content, str(metadata))
+        save_clipboard_entry(content_type, content, str(metadata), client_id)
         
         return jsonify({
             'status': 'success',
@@ -152,31 +153,39 @@ def poll_clipboard():
         # Get the last known version from query parameter
         last_version = request.args.get('version', 0, type=int)
         timeout = request.args.get('timeout', 30, type=int)
+        client_id = request.args.get('client_id', None)
         
         # Limit timeout to reasonable range
         timeout = max(1, min(timeout, 60))
+        
+        # Helper function to check if entry should be sent to this client
+        def should_send_to_client(entry):
+            if not entry or not client_id:
+                return True  # Send if no filtering needed
+            return entry.get('client_id') != client_id  # Don't send if same client
         
         # Check if there's already a change
         current_version = get_clipboard_version()
         if current_version > last_version:
             entry = get_clipboard_entry()
-            return jsonify({
-                'status': 'success',
-                'data': entry,
-                'version': current_version
-            })
+            if should_send_to_client(entry):
+                return jsonify({
+                    'status': 'success',
+                    'data': entry,
+                    'version': current_version
+                })
         
         # Wait for change
         entry = wait_for_clipboard_change(last_version, timeout)
         
-        if entry:
+        if entry and should_send_to_client(entry):
             return jsonify({
                 'status': 'success',
                 'data': entry,
                 'version': entry.get('version', current_version)
             })
         else:
-            # Timeout - return current state
+            # Timeout or filtered out - return current state
             return jsonify({
                 'status': 'timeout',
                 'version': current_version,

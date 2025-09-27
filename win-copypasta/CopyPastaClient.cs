@@ -4,6 +4,7 @@ using System.Net.Http;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Web;
 using Newtonsoft.Json;
 
 namespace CopyPasta
@@ -15,6 +16,7 @@ namespace CopyPasta
         private string? _sessionCookie;
         private int _lastKnownVersion = 0;
         private CancellationTokenSource? _pollCancellationTokenSource;
+        private readonly string _clientId;
 
         public CopyPastaClient(Settings settings)
         {
@@ -22,7 +24,8 @@ namespace CopyPasta
             _settings = settings;
             _httpClient = new HttpClient();
             _httpClient.Timeout = TimeSpan.FromSeconds(30);
-            Logger.Log("CopyPastaClient", $"HTTP client initialized with 30s timeout");
+            _clientId = GenerateClientId();
+            Logger.Log("CopyPastaClient", $"HTTP client initialized with 30s timeout, Client ID: {_clientId}");
         }
 
         public void UpdateSettings(Settings settings)
@@ -73,7 +76,8 @@ namespace CopyPasta
             var payload = new
             {
                 type = apiContentType,
-                content = content
+                content = content,
+                client_id = _clientId
             };
 
             var json = JsonConvert.SerializeObject(payload);
@@ -123,7 +127,9 @@ namespace CopyPasta
 
             var formContent = new FormUrlEncodedContent(loginData);
             string url = $"{_settings.ServerEndpoint}/login";
+            Logger.LogNetwork("Authentication", $"POST {url}", "Starting", $"Form data: username={_settings.Username}");
             var response = await _httpClient.PostAsync(url, formContent);
+            Logger.LogNetwork("Authentication", $"POST {url}", "Response", $"Status: {response.StatusCode}, HasCookies: {response.Headers.Contains("Set-Cookie")}");
 
             if (response.IsSuccessStatusCode)
             {
@@ -240,7 +246,7 @@ namespace CopyPasta
                 {
                     await EnsureAuthenticated();
 
-                    var url = $"{_settings.ServerEndpoint}/api/poll?version={_lastKnownVersion}&timeout=30";
+                    var url = $"{_settings.ServerEndpoint}/api/poll?version={_lastKnownVersion}&timeout=30&client_id={HttpUtility.UrlEncode(_clientId)}";
                     var request = new HttpRequestMessage(HttpMethod.Get, url);
 
                     if (!string.IsNullOrEmpty(_sessionCookie))
@@ -299,6 +305,15 @@ namespace CopyPasta
                     await Task.Delay(5000, cancellationToken);
                 }
             }
+        }
+
+        private string GenerateClientId()
+        {
+            // Generate a unique client ID based on machine name, user, and a random component
+            var machineName = Environment.MachineName;
+            var userName = Environment.UserName;
+            var randomPart = Guid.NewGuid().ToString("N")[..8]; // First 8 chars of GUID
+            return $"{machineName}-{userName}-{randomPart}";
         }
 
         public void Dispose()

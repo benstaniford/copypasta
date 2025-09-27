@@ -24,7 +24,8 @@ def init_db():
             content TEXT NOT NULL,
             metadata TEXT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            version INTEGER DEFAULT 1
+            version INTEGER DEFAULT 1,
+            client_id TEXT
         )
     ''')
     
@@ -39,7 +40,7 @@ def clear_clipboard():
     conn.commit()
     conn.close()
 
-def save_clipboard_entry(content_type, content, metadata=None):
+def save_clipboard_entry(content_type, content, metadata=None, client_id=None):
     """Save a new clipboard entry, removing any existing ones"""
     global _clipboard_version
     
@@ -53,9 +54,9 @@ def save_clipboard_entry(content_type, content, metadata=None):
     cursor = conn.cursor()
     
     cursor.execute('''
-        INSERT INTO clipboard_entries (content_type, content, metadata, created_at, version)
-        VALUES (?, ?, ?, ?, ?)
-    ''', (content_type, content, metadata, datetime.now().isoformat(), version))
+        INSERT INTO clipboard_entries (content_type, content, metadata, created_at, version, client_id)
+        VALUES (?, ?, ?, ?, ?, ?)
+    ''', (content_type, content, metadata, datetime.now().isoformat(), version, client_id))
     
     conn.commit()
     conn.close()
@@ -70,7 +71,7 @@ def get_clipboard_entry():
     cursor = conn.cursor()
     
     cursor.execute('''
-        SELECT content_type, content, metadata, created_at, version
+        SELECT content_type, content, metadata, created_at, version, client_id
         FROM clipboard_entries
         ORDER BY created_at DESC
         LIMIT 1
@@ -85,7 +86,8 @@ def get_clipboard_entry():
             'content': result[1],
             'metadata': result[2],
             'created_at': result[3],
-            'version': result[4]
+            'version': result[4],
+            'client_id': result[5]
         }
     return None
 
