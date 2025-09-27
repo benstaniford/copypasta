@@ -87,7 +87,7 @@
             margin-top: 0;
             color: #495057;
         }
-        textarea {
+        textarea, .paste-area {
             width: 100%;
             min-height: 150px;
             padding: 0.75rem;
@@ -96,6 +96,28 @@
             font-family: inherit;
             resize: vertical;
             box-sizing: border-box;
+        }
+        .paste-area {
+            overflow-y: auto;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+        .paste-area:empty:before {
+            content: attr(placeholder);
+            color: #6c757d;
+        }
+        .paste-area img {
+            max-width: 100%;
+            height: auto;
+            border-radius: 4px;
+            margin: 4px 0;
+        }
+        .paste-options {
+            margin: 0.5rem 0;
+        }
+        .paste-options label {
+            margin-right: 1rem;
+            font-size: 0.9rem;
         }
         .file-input-wrapper {
             position: relative;
@@ -137,6 +159,16 @@
         .preview-text {
             white-space: pre-wrap;
             word-break: break-word;
+        }
+        .preview-rich {
+            word-break: break-word;
+            line-height: 1.5;
+        }
+        .preview-rich img {
+            max-width: 100%;
+            height: auto;
+            border-radius: 4px;
+            margin: 4px 0;
         }
         .status-message {
             margin-top: 1rem;
@@ -186,7 +218,13 @@
             <div class="clipboard-container">
                 <div class="paste-section">
                     <h3>📋 Paste Content</h3>
-                    <textarea id="pasteText" placeholder="Paste your text here..."></textarea>
+                    <div id="pasteArea" contenteditable="true" class="paste-area" placeholder="Paste your text or rich content here..."></div>
+                    <textarea id="pasteText" placeholder="Or paste plain text here..." style="display: none;"></textarea>
+                    
+                    <div class="paste-options">
+                        <label><input type="radio" name="pasteMode" value="rich" checked> Rich Text & Images</label>
+                        <label><input type="radio" name="pasteMode" value="plain"> Plain Text Only</label>
+                    </div>
                     
                     <div class="file-input-wrapper">
                         <label for="imageInput" class="file-input-label">📷 Upload Image</label>
@@ -222,6 +260,12 @@
         document.addEventListener('DOMContentLoaded', function() {
             refreshClipboard();
             
+            // Handle paste mode switching
+            const pasteModeRadios = document.querySelectorAll('input[name="pasteMode"]');
+            pasteModeRadios.forEach(radio => {
+                radio.addEventListener('change', switchPasteMode);
+            });
+            
             // Handle image file selection
             document.getElementById('imageInput').addEventListener('change', function(e) {
                 const file = e.target.files[0];
@@ -233,7 +277,66 @@
                     reader.readAsDataURL(file);
                 }
             });
+            
+            // Handle paste events for rich text area
+            document.getElementById('pasteArea').addEventListener('paste', handleRichPaste);
         });
+
+        function switchPasteMode() {
+            const selectedMode = document.querySelector('input[name="pasteMode"]:checked').value;
+            const pasteArea = document.getElementById('pasteArea');
+            const pasteText = document.getElementById('pasteText');
+            
+            if (selectedMode === 'rich') {
+                pasteArea.style.display = 'block';
+                pasteText.style.display = 'none';
+            } else {
+                pasteArea.style.display = 'none';
+                pasteText.style.display = 'block';
+            }
+        }
+
+        function handleRichPaste(e) {
+            e.preventDefault();
+            
+            const clipboardData = e.clipboardData || window.clipboardData;
+            const items = clipboardData.items;
+            
+            // Check for images first
+            for (let i = 0; i < items.length; i++) {
+                if (items[i].type.indexOf('image') !== -1) {
+                    const blob = items[i].getAsFile();
+                    const reader = new FileReader();
+                    reader.onload = function(e) {
+                        const img = document.createElement('img');
+                        img.src = e.target.result;
+                        img.style.maxWidth = '100%';
+                        img.style.height = 'auto';
+                        
+                        const selection = window.getSelection();
+                        if (selection.rangeCount > 0) {
+                            const range = selection.getRangeAt(0);
+                            range.insertNode(img);
+                            range.collapse(false);
+                        } else {
+                            document.getElementById('pasteArea').appendChild(img);
+                        }
+                    };
+                    reader.readAsDataURL(blob);
+                    return;
+                }
+            }
+            
+            // Handle HTML/rich text
+            const htmlData = clipboardData.getData('text/html');
+            const textData = clipboardData.getData('text/plain');
+            
+            if (htmlData) {
+                document.execCommand('insertHTML', false, htmlData);
+            } else if (textData) {
+                document.execCommand('insertText', false, textData);
+            }
+        }
 
         function showStatus(elementId, message, isError = false) {
             const element = document.getElementById(elementId);
@@ -248,14 +351,34 @@
 
         async function pasteContent(type = null, content = null) {
             try {
-                let contentType = type || 'text';
+                let contentType = type || detectContentType();
                 let contentData = content;
                 
                 if (!contentData) {
-                    contentData = document.getElementById('pasteText').value.trim();
-                    if (!contentData) {
-                        showStatus('pasteStatus', 'Please enter some content to paste', true);
-                        return;
+                    const selectedMode = document.querySelector('input[name="pasteMode"]:checked').value;
+                    
+                    if (selectedMode === 'rich') {
+                        const pasteArea = document.getElementById('pasteArea');
+                        if (pasteArea.innerHTML.trim() === '' || pasteArea.innerHTML === '<br>') {
+                            showStatus('pasteStatus', 'Please enter some content to paste', true);
+                            return;
+                        }
+                        
+                        // Check if content contains images or formatting
+                        if (pasteArea.querySelector('img') || pasteArea.innerHTML !== pasteArea.textContent) {
+                            contentType = 'rich';
+                            contentData = pasteArea.innerHTML;
+                        } else {
+                            contentType = 'text';
+                            contentData = pasteArea.textContent;
+                        }
+                    } else {
+                        contentData = document.getElementById('pasteText').value.trim();
+                        if (!contentData) {
+                            showStatus('pasteStatus', 'Please enter some content to paste', true);
+                            return;
+                        }
+                        contentType = 'text';
                     }
                 }
 
@@ -274,8 +397,13 @@
                 
                 if (response.ok) {
                     showStatus('pasteStatus', 'Content saved to clipboard!');
-                    if (contentType === 'text') {
-                        document.getElementById('pasteText').value = '';
+                    if (contentType === 'text' || contentType === 'rich') {
+                        const selectedMode = document.querySelector('input[name="pasteMode"]:checked').value;
+                        if (selectedMode === 'rich') {
+                            document.getElementById('pasteArea').innerHTML = '';
+                        } else {
+                            document.getElementById('pasteText').value = '';
+                        }
                     } else {
                         document.getElementById('imageInput').value = '';
                     }
@@ -286,6 +414,16 @@
             } catch (error) {
                 showStatus('pasteStatus', 'Error: ' + error.message, true);
             }
+        }
+
+        function detectContentType() {
+            const selectedMode = document.querySelector('input[name="pasteMode"]:checked').value;
+            if (selectedMode === 'plain') return 'text';
+            
+            const pasteArea = document.getElementById('pasteArea');
+            if (pasteArea.querySelector('img')) return 'rich';
+            if (pasteArea.innerHTML !== pasteArea.textContent) return 'rich';
+            return 'text';
         }
 
         async function refreshClipboard() {
@@ -312,6 +450,12 @@
             
             if (data.content_type === 'image') {
                 container.innerHTML = `<img src="${data.content}" class="preview-image" alt="Clipboard Image">`;
+            } else if (data.content_type === 'rich') {
+                const div = document.createElement('div');
+                div.className = 'preview-rich';
+                div.innerHTML = data.content;
+                container.innerHTML = '';
+                container.appendChild(div);
             } else {
                 const div = document.createElement('div');
                 div.className = 'preview-text';
@@ -338,8 +482,47 @@
                     // For images, we can't use the clipboard API directly
                     // Instead, we'll show instructions to save the image
                     showStatus('copyStatus', 'Right-click the image and "Save Image" to copy it');
+                } else if (currentClipboard.content_type === 'rich') {
+                    // For rich text, try to copy both HTML and plain text
+                    if (navigator.clipboard && navigator.clipboard.write) {
+                        try {
+                            const tempDiv = document.createElement('div');
+                            tempDiv.innerHTML = currentClipboard.content;
+                            const plainText = tempDiv.textContent || tempDiv.innerText || '';
+                            
+                            const clipboardItems = [
+                                new ClipboardItem({
+                                    'text/html': new Blob([currentClipboard.content], { type: 'text/html' }),
+                                    'text/plain': new Blob([plainText], { type: 'text/plain' })
+                                })
+                            ];
+                            
+                            await navigator.clipboard.write(clipboardItems);
+                            showStatus('copyStatus', 'Rich content copied to device clipboard!');
+                        } catch (richError) {
+                            // Fallback to plain text if rich copy fails
+                            const tempDiv = document.createElement('div');
+                            tempDiv.innerHTML = currentClipboard.content;
+                            const plainText = tempDiv.textContent || tempDiv.innerText || '';
+                            await navigator.clipboard.writeText(plainText);
+                            showStatus('copyStatus', 'Text content copied to device clipboard!');
+                        }
+                    } else {
+                        // Fallback for older browsers - copy as plain text
+                        const tempDiv = document.createElement('div');
+                        tempDiv.innerHTML = currentClipboard.content;
+                        const plainText = tempDiv.textContent || tempDiv.innerText || '';
+                        
+                        const textArea = document.createElement('textarea');
+                        textArea.value = plainText;
+                        document.body.appendChild(textArea);
+                        textArea.select();
+                        document.execCommand('copy');
+                        document.body.removeChild(textArea);
+                        showStatus('copyStatus', 'Text content copied to device clipboard!');
+                    }
                 } else {
-                    // For text content, use the Clipboard API
+                    // For plain text content, use the Clipboard API
                     if (navigator.clipboard && navigator.clipboard.writeText) {
                         await navigator.clipboard.writeText(currentClipboard.content);
                         showStatus('copyStatus', 'Text copied to device clipboard!');

@@ -88,6 +88,16 @@ def paste():
             except Exception as e:
                 return jsonify({'error': 'Invalid image data'}), 400
         
+        elif content_type == 'rich':
+            # Validate and sanitize rich text content
+            # For now, we'll allow HTML content but could add sanitization here
+            if not content or len(content.strip()) == 0:
+                return jsonify({'error': 'Rich content cannot be empty'}), 400
+            
+            # Basic validation - ensure it's not too large
+            if len(content) > 1000000:  # 1MB limit for rich content
+                return jsonify({'error': 'Rich content too large (max 1MB)'}), 400
+        
         # Save to database
         metadata = {
             'timestamp': datetime.now().isoformat(),
