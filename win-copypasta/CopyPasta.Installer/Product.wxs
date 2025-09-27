@@ -21,9 +21,7 @@
     <!-- Feature Definition -->
     <Feature Id="ProductFeature" Title="CopyPasta" Level="1">
       <ComponentGroupRef Id="ProductComponents" />
-      <ComponentRef Id="StartMenuShortcut" />
-      <ComponentRef Id="DesktopShortcut" />
-      <ComponentRef Id="AutoStartRegistry" />
+      <ComponentRef Id="UserShortcuts" />
     </Feature>
 
     <!-- UI Configuration -->
@@ -59,7 +57,7 @@
   <!-- Components -->
   <Fragment>
     <ComponentGroup Id="ProductComponents" Directory="INSTALLFOLDER">
-      <!-- Main Application -->
+      <!-- Main Application Files (per-machine) -->
       <Component Id="MainExecutable" Guid="11111111-1111-1111-1111-111111111111">
         <File Id="CopyPastaExe" 
               Source="$(var.CopyPasta.TargetDir)CopyPasta.exe" 
@@ -89,53 +87,43 @@
       </Component>
     </ComponentGroup>
 
-    <!-- Auto-start registry entry -->
-    <Component Id="AutoStartRegistry" 
-               Directory="INSTALLFOLDER" 
-               Guid="77777777-7777-7777-7777-777777777777">
+    <!-- Per-user shortcuts and settings -->
+    <Component Id="UserShortcuts" Directory="INSTALLFOLDER" Guid="55555555-5555-5555-5555-555555555555">
+      <!-- Start Menu Shortcut -->
+      <Shortcut Id="ApplicationStartMenuShortcut"
+                Directory="ApplicationProgramsFolder"
+                Name="CopyPasta"
+                Description="Cross-device clipboard sharing"
+                Target="[INSTALLFOLDER]CopyPasta.exe"
+                WorkingDirectory="INSTALLFOLDER"
+                Icon="CopyPastaIcon" />
+      
+      <!-- Desktop Shortcut -->
+      <Shortcut Id="ApplicationDesktopShortcut"
+                Directory="DesktopFolder"
+                Name="CopyPasta"
+                Description="Cross-device clipboard sharing"
+                Target="[INSTALLFOLDER]CopyPasta.exe"
+                WorkingDirectory="INSTALLFOLDER"
+                Icon="CopyPastaIcon" />
+      
+      <!-- Auto-start registry entry -->
       <RegistryValue Root="HKCU"
                      Key="SOFTWARE\Microsoft\Windows\CurrentVersion\Run"
                      Name="CopyPasta"
-                     Value="&quot;[#CopyPastaExe]&quot;"
-                     Type="string"
-                     KeyPath="yes" />
-    </Component>
-
-    <!-- Start Menu Shortcut -->
-    <Component Id="StartMenuShortcut" 
-               Directory="ApplicationProgramsFolder" 
-               Guid="55555555-5555-5555-5555-555555555555">
-      <Shortcut Id="ApplicationStartMenuShortcut"
-                Name="CopyPasta"
-                Description="Cross-device clipboard sharing"
-                Target="[#CopyPastaExe]"
-                WorkingDirectory="INSTALLFOLDER"
-                Icon="CopyPastaIcon" />
-      <RemoveFolder Id="ApplicationProgramsFolder" On="uninstall" />
+                     Value="&quot;[INSTALLFOLDER]CopyPasta.exe&quot;"
+                     Type="string" />
+      
+      <!-- Registry key as KeyPath for per-user component -->
       <RegistryValue Root="HKCU" 
                      Key="Software\CopyPasta" 
-                     Name="StartMenuShortcut" 
+                     Name="Installed" 
                      Type="integer" 
                      Value="1" 
                      KeyPath="yes" />
-    </Component>
-
-    <!-- Desktop Shortcut -->
-    <Component Id="DesktopShortcut" 
-               Directory="DesktopFolder" 
-               Guid="66666666-6666-6666-6666-666666666666">
-      <Shortcut Id="ApplicationDesktopShortcut"
-                Name="CopyPasta"
-                Description="Cross-device clipboard sharing"
-                Target="[#CopyPastaExe]"
-                WorkingDirectory="INSTALLFOLDER"
-                Icon="CopyPastaIcon" />
-      <RegistryValue Root="HKCU" 
-                     Key="Software\CopyPasta" 
-                     Name="DesktopShortcut" 
-                     Type="integer" 
-                     Value="1" 
-                     KeyPath="yes" />
+      
+      <!-- Remove folder on uninstall -->
+      <RemoveFolder Id="ApplicationProgramsFolder" Directory="ApplicationProgramsFolder" On="uninstall" />
     </Component>
   </Fragment>
 </Wix>
