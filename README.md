@@ -46,7 +46,7 @@ services:
 
 - **Web Interface** - Works on any device with a browser
 - **Linux CLI** - Command-line tool for Linux systems
-- **Windows Client** - Native Windows application (coming soon)
+- **Windows Client** - Native Windows application
 
 Check the [Releases page](https://github.com/your-repo/copypasta/releases) for the latest client downloads.
 
