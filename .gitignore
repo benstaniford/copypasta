@@ -8,6 +8,7 @@ __pycache__/
 
 # Vscode
 .vscode
+.claude/
 
 # SQL lite db
 clipboard.db

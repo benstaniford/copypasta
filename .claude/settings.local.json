@@ -14,7 +14,9 @@
       "Bash(docker logs:*)",
       "Bash(docker-compose build:*)",
       "Bash(docker-compose up:*)",
-      "Bash(./test-docker/test-container.sh:*)"
+      "Bash(./test-docker/test-container.sh:*)",
+      "Read(//home/ben/Code/remote-control/**)",
+      "Read(//home/ben/Code/remote-control/**)"
     ],
     "deny": [],
     "ask": []
