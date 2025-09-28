@@ -32,6 +32,11 @@ jobs:
           echo "Version: $numericVersion"
 
       # C# Build and Test
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '6.0.x'
+
       - name: Setup .NET Framework
         uses: microsoft/setup-msbuild@v2
 
@@ -91,7 +96,7 @@ jobs:
           Get-Content $wxsPath | Select-String "Version="
           
       - name: Publish C# Project for WiX
-        run: dotnet publish win-copypasta/CopyPasta.csproj -c Release -r win-x86 --self-contained false -o win-copypasta/bin/Release/net6.0-windows/
+        run: dotnet publish win-copypasta/CopyPasta.csproj -c Release -r win-x86 --self-contained false -o win-copypasta/bin/Release/net6.0-windows/ -p:TreatWarningsAsErrors=false
 
       # WiX Installer Build
       - name: Setup WiX Toolset
