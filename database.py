@@ -7,16 +7,12 @@ import time
 
 DATABASE_PATH = os.path.join(os.path.dirname(__file__), 'clipboard.db')
 
-# Global version counter and lock for clipboard changes
-_clipboard_version = 0
+# Global lock and condition for clipboard change notifications
 _clipboard_lock = threading.Lock()
 _clipboard_changed_condition = threading.Condition(_clipboard_lock)
-_version_initialized = False
 
 def init_db():
     """Initialize the database with required tables"""
-    global _clipboard_version, _version_initialized
-    
     conn = sqlite3.connect(DATABASE_PATH)
     cursor = conn.cursor()
     
@@ -32,6 +28,14 @@ def init_db():
         )
     ''')
     
+    # Create metadata table for global version counter
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS app_metadata (
+            key TEXT PRIMARY KEY,
+            value INTEGER NOT NULL
+        )
+    ''')
+    
     # Migration: Add new columns if they don't exist
     try:
         cursor.execute('ALTER TABLE clipboard_entries ADD COLUMN version INTEGER DEFAULT 1')
@@ -43,14 +47,8 @@ def init_db():
     except sqlite3.OperationalError:
         pass  # Column already exists
     
-    # Initialize global version counter from database
-    if not _version_initialized:
-        with _clipboard_lock:
-            cursor.execute('SELECT MAX(version) FROM clipboard_entries')
-            max_version = cursor.fetchone()[0]
-            if max_version is not None:
-                _clipboard_version = max_version
-            _version_initialized = True
+    # Initialize version counter in database if not exists
+    cursor.execute('INSERT OR IGNORE INTO app_metadata (key, value) VALUES ("clipboard_version", 0)')
     
     conn.commit()
     conn.close()
@@ -65,24 +63,41 @@ def clear_clipboard():
 
 def save_clipboard_entry(content_type, content, metadata=None, client_id=None):
     """Save a new clipboard entry, removing any existing ones"""
-    global _clipboard_version
-    
-    clear_clipboard()
-    
-    with _clipboard_lock:
-        _clipboard_version += 1
-        version = _clipboard_version
-    
     conn = sqlite3.connect(DATABASE_PATH)
     cursor = conn.cursor()
     
-    cursor.execute('''
-        INSERT INTO clipboard_entries (content_type, content, metadata, created_at, version, client_id)
-        VALUES (?, ?, ?, ?, ?, ?)
-    ''', (content_type, content, metadata, datetime.now().isoformat(), version, client_id))
-    
-    conn.commit()
-    conn.close()
+    try:
+        # Start transaction for atomic operation
+        cursor.execute('BEGIN IMMEDIATE')
+        
+        # Clear existing entries
+        cursor.execute('DELETE FROM clipboard_entries')
+        
+        # Increment version counter atomically
+        cursor.execute('''
+            UPDATE app_metadata 
+            SET value = value + 1 
+            WHERE key = "clipboard_version"
+        ''')
+        
+        # Get the new version
+        cursor.execute('SELECT value FROM app_metadata WHERE key = "clipboard_version"')
+        version = cursor.fetchone()[0]
+        
+        # Insert new clipboard entry
+        cursor.execute('''
+            INSERT INTO clipboard_entries (content_type, content, metadata, created_at, version, client_id)
+            VALUES (?, ?, ?, ?, ?, ?)
+        ''', (content_type, content, metadata, datetime.now().isoformat(), version, client_id))
+        
+        # Commit transaction
+        conn.commit()
+        
+    except Exception as e:
+        conn.rollback()
+        raise e
+    finally:
+        conn.close()
     
     # Notify waiting clients
     with _clipboard_changed_condition:
@@ -115,9 +130,13 @@ def get_clipboard_entry():
     return None
 
 def get_clipboard_version():
-    """Get the current clipboard version"""
-    with _clipboard_lock:
-        return _clipboard_version
+    """Get the current clipboard version from database"""
+    conn = sqlite3.connect(DATABASE_PATH)
+    cursor = conn.cursor()
+    cursor.execute('SELECT value FROM app_metadata WHERE key = "clipboard_version"')
+    result = cursor.fetchone()
+    conn.close()
+    return result[0] if result else 0
 
 def wait_for_clipboard_change(last_version, timeout=30):
     """Wait for clipboard to change from last_version, with timeout"""
@@ -125,14 +144,10 @@ def wait_for_clipboard_change(last_version, timeout=30):
     
     with _clipboard_changed_condition:
         while time.time() - start_time < timeout:
-            current_version = _clipboard_version
+            # Check current version from database
+            current_version = get_clipboard_version()
             if current_version > last_version:
-                # Release lock before database access
-                _clipboard_changed_condition.release()
-                try:
-                    return get_clipboard_entry()
-                finally:
-                    _clipboard_changed_condition.acquire()
+                return get_clipboard_entry()
             
             # Calculate remaining timeout
             remaining_timeout = timeout - (time.time() - start_time)
