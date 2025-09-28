@@ -87,94 +87,23 @@ class ClipboardMonitor {
             return (content: "data:image/png;base64,\(base64String)", type: .image)
         }
         
-        // Get plain text content for comparison
-        let plainText = pasteboard.string(forType: .string) ?? ""
-        
         // Check for rich text (RTF)
         if let rtfData = pasteboard.data(forType: .rtf),
            let attributedString = NSAttributedString(rtf: rtfData, documentAttributes: nil) {
-            
-            // Check if RTF content is actually rich or just plain text with RTF wrapper
-            if isActuallyRichContent(attributedString: attributedString, plainText: plainText) {
-                // Convert to HTML for rich text
-                if let htmlData = try? attributedString.data(from: NSRange(location: 0, length: attributedString.length),
-                                                            documentAttributes: [.documentType: NSAttributedString.DocumentType.html]) {
-                    let htmlString = String(data: htmlData, encoding: .utf8) ?? attributedString.string
-                    return (content: htmlString, type: .richText)
-                }
-            } else {
-                // RTF exists but content is equivalent to plain text, treat as plain text
-                Logger.log("ClipboardMonitor", "RTF detected but content is plain text equivalent")
-                return (content: plainText.isEmpty ? attributedString.string : plainText, type: .text)
+            // Convert to HTML for rich text
+            if let htmlData = try? attributedString.data(from: NSRange(location: 0, length: attributedString.length),
+                                                        documentAttributes: [.documentType: NSAttributedString.DocumentType.html]) {
+                let htmlString = String(data: htmlData, encoding: .utf8) ?? attributedString.string
+                return (content: htmlString, type: .richText)
             }
         }
         
         // Check for plain text
-        if !plainText.isEmpty {
-            return (content: plainText, type: .text)
+        if let string = pasteboard.string(forType: .string), !string.isEmpty {
+            return (content: string, type: .text)
         }
         
         return nil
-    }
-    
-    private func isActuallyRichContent(attributedString: NSAttributedString, plainText: String) -> Bool {
-        // If the attributed string's plain text is significantly different from clipboard plain text, it's rich
-        let rtfPlainText = attributedString.string
-        let normalizedRtfText = rtfPlainText.trimmingCharacters(in: .whitespacesAndNewlines)
-        let normalizedPlainText = plainText.trimmingCharacters(in: .whitespacesAndNewlines)
-        
-        // If texts don't match, it might be rich content
-        if normalizedRtfText != normalizedPlainText {
-            Logger.log("ClipboardMonitor", "Text mismatch detected - RTF: '\(normalizedRtfText.prefix(50))...', Plain: '\(normalizedPlainText.prefix(50))...'")
-            return true
-        }
-        
-        // Check for actual formatting attributes beyond the base font
-        let fullRange = NSRange(location: 0, length: attributedString.length)
-        var hasRichFormatting = false
-        
-        attributedString.enumerateAttributes(in: fullRange, options: []) { attributes, range, stop in
-            // Check for attributes that indicate rich formatting
-            for (key, value) in attributes {
-                switch key {
-                case .font:
-                    // Allow basic font but check for variations in font within the text
-                    continue
-                case .foregroundColor, .backgroundColor:
-                    // Colors indicate rich formatting
-                    hasRichFormatting = true
-                    stop.pointee = true
-                case .underlineStyle:
-                    if let underlineValue = value as? Int, underlineValue != 0 {
-                        hasRichFormatting = true
-                        stop.pointee = true
-                    }
-                case .link, .attachment:
-                    // Links and attachments are definitely rich content
-                    hasRichFormatting = true
-                    stop.pointee = true
-                case .strikethroughStyle:
-                    if let strikethroughValue = value as? Int, strikethroughValue != 0 {
-                        hasRichFormatting = true
-                        stop.pointee = true
-                    }
-                default:
-                    // Other formatting attributes might indicate rich content
-                    if key.rawValue.contains("Style") || key.rawValue.contains("Color") {
-                        hasRichFormatting = true
-                        stop.pointee = true
-                    }
-                }
-            }
-        }
-        
-        if hasRichFormatting {
-            Logger.log("ClipboardMonitor", "Rich formatting attributes detected")
-        } else {
-            Logger.log("ClipboardMonitor", "No rich formatting detected - treating as plain text")
-        }
-        
-        return hasRichFormatting
     }
     
     func setClipboardContent(content: String, type: ClipboardContentType) {
