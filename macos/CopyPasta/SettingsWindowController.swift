@@ -3,6 +3,7 @@ import SwiftUI
 
 protocol SettingsWindowControllerDelegate: AnyObject {
     func settingsDidChange(_ settings: Settings)
+    func testConnection() async -> Bool
 }
 
 class SettingsWindowController: NSWindowController {
@@ -32,6 +33,7 @@ class SettingsWindowController: NSWindowController {
         window.center()
         window.isReleasedWhenClosed = false
         window.level = .normal
+        window.delegate = self
     }
     
     private func setupContent() {
@@ -47,7 +49,7 @@ class SettingsWindowController: NSWindowController {
             },
             onCancel: { [weak self] in
                 Logger.log("SettingsWindowController", "Cancel button clicked")
-                self?.close()
+                self?.window?.close()
             }
         )
         
@@ -56,16 +58,15 @@ class SettingsWindowController: NSWindowController {
     }
     
     private func testConnection() async -> Bool {
-        let client = CopyPastaClient()
-        client.updateSettings(settings)
-        return await client.testConnection()
+        Logger.log("SettingsWindowController", "Testing connection via delegate")
+        return await delegate?.testConnection() ?? false
     }
     
     private func saveSettings() {
         Logger.log("SettingsWindowController", "Save button clicked")
         delegate?.settingsDidChange(settings)
         Logger.log("SettingsWindowController", "Closing settings window")
-        close()
+        window?.close()
     }
 }
 
@@ -169,5 +170,14 @@ struct SettingsView: View {
         DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
             connectionTestResult = ""
         }
+    }
+}
+
+// MARK: - NSWindowDelegate
+extension SettingsWindowController: NSWindowDelegate {
+    func windowWillClose(_ notification: Notification) {
+        Logger.log("SettingsWindowController", "Window will close")
+        // Clear the reference in AppDelegate when window closes
+        delegate = nil
     }
 }

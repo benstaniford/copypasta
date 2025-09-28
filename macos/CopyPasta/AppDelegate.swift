@@ -12,6 +12,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusBarController: StatusBarController!
     private var clipboardMonitor: ClipboardMonitor!
     private var copyPastaClient: CopyPastaClient!
+    private var settingsController: SettingsWindowController?
     
     func applicationDidFinishLaunching(_ notification: Notification) {
         print("CopyPasta: applicationDidFinishLaunching called")
@@ -127,10 +128,13 @@ extension AppDelegate: StatusBarControllerDelegate {
     }
     
     private func showSettings() {
-        let settingsController = SettingsWindowController()
-        settingsController.delegate = self
-        settingsController.showWindow(nil)
-        settingsController.window?.makeKeyAndOrderFront(nil)
+        if settingsController == nil {
+            settingsController = SettingsWindowController()
+            settingsController?.delegate = self
+        }
+        
+        settingsController?.showWindow(nil)
+        settingsController?.window?.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
     }
     
@@ -153,6 +157,16 @@ extension AppDelegate: SettingsWindowControllerDelegate {
         } else {
             copyPastaClient.stopPolling()
         }
+        
+        // Clear the settings controller reference when done
+        settingsController = nil
+    }
+    
+    func testConnection() async -> Bool {
+        Logger.log("AppDelegate", "Testing connection using main CopyPastaClient")
+        // Update the main client with current settings first
+        copyPastaClient.updateSettings(Settings.shared)
+        return await copyPastaClient.testConnection()
     }
 }
 
