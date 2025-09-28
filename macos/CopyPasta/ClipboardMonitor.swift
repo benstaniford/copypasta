@@ -129,63 +129,38 @@ class ClipboardMonitor {
             return true
         }
         
-        // Check for meaningful formatting attributes beyond basic terminal styling
+        // Check for actual formatting attributes beyond the base font
         let fullRange = NSRange(location: 0, length: attributedString.length)
         var hasRichFormatting = false
-        var fontCount = 0
-        var colorCount = 0
         
         attributedString.enumerateAttributes(in: fullRange, options: []) { attributes, range, stop in
             // Check for attributes that indicate rich formatting
             for (key, value) in attributes {
                 switch key {
                 case .font:
-                    fontCount += 1
-                    // Multiple different fonts within the text indicates rich formatting
+                    // Allow basic font but check for variations in font within the text
                     continue
                 case .foregroundColor, .backgroundColor:
-                    colorCount += 1
-                    // Basic terminal colors are common - only consider it rich if there are multiple colors
-                    // or if combined with other formatting
-                    continue
+                    // Colors indicate rich formatting
+                    hasRichFormatting = true
+                    stop.pointee = true
                 case .underlineStyle:
                     if let underlineValue = value as? Int, underlineValue != 0 {
-                        Logger.log("ClipboardMonitor", "Underline detected - rich content")
                         hasRichFormatting = true
                         stop.pointee = true
                     }
                 case .link, .attachment:
                     // Links and attachments are definitely rich content
-                    Logger.log("ClipboardMonitor", "Links/attachments detected - rich content")
                     hasRichFormatting = true
                     stop.pointee = true
                 case .strikethroughStyle:
                     if let strikethroughValue = value as? Int, strikethroughValue != 0 {
-                        Logger.log("ClipboardMonitor", "Strikethrough detected - rich content")
                         hasRichFormatting = true
                         stop.pointee = true
                     }
-                case .paragraphStyle:
-                    // Check if paragraph style has meaningful formatting beyond basic text
-                    if let paragraphStyle = value as? NSParagraphStyle {
-                        // Basic paragraph styles are okay, but complex formatting indicates rich content
-                        if paragraphStyle.alignment != .natural && paragraphStyle.alignment != .left {
-                            Logger.log("ClipboardMonitor", "Non-standard text alignment detected - rich content")
-                            hasRichFormatting = true
-                            stop.pointee = true
-                        }
-                        if !paragraphStyle.tabStops.isEmpty || paragraphStyle.firstLineHeadIndent != 0 || paragraphStyle.headIndent != 0 {
-                            Logger.log("ClipboardMonitor", "Complex paragraph formatting detected - rich content")
-                            hasRichFormatting = true
-                            stop.pointee = true
-                        }
-                    }
                 default:
-                    // Only consider other style attributes if they're not basic font variant attributes
-                    if key.rawValue.contains("Style") && 
-                       !key.rawValue.contains("font") && 
-                       !key.rawValue.contains("Font") {
-                        Logger.log("ClipboardMonitor", "Advanced style attribute detected: \(key.rawValue) - rich content")
+                    // Other formatting attributes might indicate rich content
+                    if key.rawValue.contains("Style") || key.rawValue.contains("Color") {
                         hasRichFormatting = true
                         stop.pointee = true
                     }
@@ -193,20 +168,13 @@ class ClipboardMonitor {
             }
         }
         
-        // Terminal text often has uniform font and color - only consider it rich if there's variation or other formatting
-        // For simple terminal content: single font + single color = plain text
-        let isTerminalStyling = fontCount <= 1 && colorCount <= 1 && !hasRichFormatting
-        
-        if isTerminalStyling {
-            Logger.log("ClipboardMonitor", "Terminal-style formatting detected (uniform font/color) - treating as plain text")
-            return false
-        } else if hasRichFormatting {
+        if hasRichFormatting {
             Logger.log("ClipboardMonitor", "Rich formatting attributes detected")
-            return true
         } else {
             Logger.log("ClipboardMonitor", "No rich formatting detected - treating as plain text")
-            return false
         }
+        
+        return hasRichFormatting
     }
     
     func setClipboardContent(content: String, type: ClipboardContentType) {
