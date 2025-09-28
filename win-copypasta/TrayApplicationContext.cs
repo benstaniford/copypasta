@@ -81,6 +81,9 @@ namespace CopyPasta
             var viewLogsItem = new ToolStripMenuItem("View Logs...");
             viewLogsItem.Click += ViewLogsItem_Click;
             
+            var aboutItem = new ToolStripMenuItem("About...");
+            aboutItem.Click += AboutItem_Click;
+            
             var separatorItem = new ToolStripSeparator();
             
             var exitItem = new ToolStripMenuItem("Exit");
@@ -92,6 +95,7 @@ namespace CopyPasta
                 new ToolStripSeparator(),
                 settingsItem,
                 viewLogsItem,
+                aboutItem,
                 separatorItem,
                 exitItem
             });
@@ -175,6 +179,12 @@ namespace CopyPasta
             Logger.OpenLogFile();
         }
 
+        private void AboutItem_Click(object? sender, EventArgs e)
+        {
+            Logger.Log("TrayApp", "About menu clicked");
+            ShowAbout();
+        }
+
         private void OnClipboardChangedOnServer(object? sender, ClipboardChangedEventArgs e)
         {
             Logger.Log("TrayApp", $"Clipboard changed on server: {e.ContentType} content, length: {e.Content?.Length ?? 0}");
@@ -208,6 +218,14 @@ namespace CopyPasta
                         _client.StartPolling();
                     }
                 }
+            }
+        }
+
+        private void ShowAbout()
+        {
+            using (var aboutForm = new AboutForm())
+            {
+                aboutForm.ShowDialog();
             }
         }
 
