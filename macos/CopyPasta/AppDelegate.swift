@@ -71,15 +71,23 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
         
         Logger.log("AppDelegate", "Checking accessibility permissions...")
-        // Check accessibility permissions before starting clipboard monitoring
-        AccessibilityPermissionManager.shared.startPeriodicCheck { [weak self] in
-            Logger.log("AppDelegate", "Accessibility permissions granted, starting clipboard monitoring...")
-            self?.clipboardMonitor.startMonitoring()
+        // Check accessibility permissions and start clipboard monitoring accordingly
+        if AccessibilityPermissionManager.shared.hasAccessibilityPermissions() {
+            Logger.log("AppDelegate", "Accessibility permissions already granted, starting clipboard monitoring...")
+            clipboardMonitor.startMonitoring()
             Logger.log("AppDelegate", "All services started")
+        } else {
+            Logger.log("AppDelegate", "Accessibility permissions not granted, setting up permission monitoring...")
+            // Start periodic check for when permissions are granted
+            AccessibilityPermissionManager.shared.startPeriodicCheck { [weak self] in
+                Logger.log("AppDelegate", "Accessibility permissions granted, starting clipboard monitoring...")
+                self?.clipboardMonitor.startMonitoring()
+                Logger.log("AppDelegate", "All services started")
+            }
+            
+            // Request permissions (will show dialog if needed)
+            AccessibilityPermissionManager.shared.requestAccessibilityPermissions()
         }
-        
-        // Request permissions if not already granted
-        AccessibilityPermissionManager.shared.requestAccessibilityPermissions()
     }
     
     private func cleanup() {

@@ -39,20 +39,38 @@ class StatusBarController: NSObject {
     }
     
     private func setupStatusItem() {
+        Logger.log("StatusBarController", "Setting up status item...")
+        
         // Set the status bar icon
         if let button = statusItem.button {
+            Logger.log("StatusBarController", "Status item button found, setting up icon...")
             // Use SF Symbols for a clean look
             if #available(macOS 11.0, *) {
-                button.image = NSImage(systemSymbolName: "doc.on.clipboard", accessibilityDescription: "CopyPasta")
+                let image = NSImage(systemSymbolName: "doc.on.clipboard", accessibilityDescription: "CopyPasta")
+                if image != nil {
+                    button.image = image
+                    Logger.log("StatusBarController", "SF Symbol icon set successfully")
+                } else {
+                    Logger.log("StatusBarController", "SF Symbol not found, using emoji fallback")
+                    button.title = "📋"
+                }
             } else {
                 // Fallback for older macOS versions
+                Logger.log("StatusBarController", "Using emoji fallback for older macOS")
                 button.title = "📋"
             }
             button.imagePosition = .imageOnly
             button.toolTip = "CopyPasta - Cross-device clipboard sharing"
+            
+            Logger.log("StatusBarController", "Status item button configured")
+        } else {
+            Logger.log("StatusBarController", "ERROR: Could not get status item button!")
         }
         
         statusItem.menu = menu
+        statusItem.isVisible = true
+        
+        Logger.log("StatusBarController", "Status item setup complete, visible: \(statusItem.isVisible)")
     }
     
     private func setupMenu() {
