@@ -30,4 +30,8 @@
     <EmbeddedResource Include="icon.ico" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Compile Include="AboutForm.cs" />
+  </ItemGroup>
+
 </Project>
