@@ -21,10 +21,13 @@ class ClipboardMonitor {
     private var isUpdatingFromServer = false
     
     func startMonitoring() {
-        Logger.log("ClipboardMonitor", "Starting clipboard monitoring")
+        Logger.log("ClipboardMonitor", "=== START MONITORING CALLED ===")
+        print("ClipboardMonitor: startMonitoring() called")
         
         // Start monitoring with a slight delay to avoid blocking app launch
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
+            Logger.log("ClipboardMonitor", "=== DELAYED START EXECUTING ===")
+            print("ClipboardMonitor: Delayed start executing")
             guard let self = self else { return }
             
             do {

@@ -86,7 +86,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         
         Logger.log("AppDelegate", "Checking accessibility permissions...")
         // Check accessibility permissions and start clipboard monitoring accordingly
-        if AccessibilityPermissionManager.shared.hasAccessibilityPermissions() {
+        let hasPermissions = AccessibilityPermissionManager.shared.hasAccessibilityPermissions()
+        Logger.log("AppDelegate", "Accessibility permissions status: \(hasPermissions)")
+        
+        if hasPermissions {
             Logger.log("AppDelegate", "Accessibility permissions already granted, starting clipboard monitoring...")
             clipboardMonitor.startMonitoring()
             Logger.log("AppDelegate", "All services started")
