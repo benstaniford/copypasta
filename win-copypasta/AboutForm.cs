@@ -119,7 +119,40 @@ namespace CopyPasta
         {
             try
             {
-                // Priority 1: Try to get from registry (installer version) - most accurate
+                // Priority 1: Try to get from CopyPasta registry key (installer version) - most accurate
+                try
+                {
+                    using var key = Registry.LocalMachine.OpenSubKey(@"SOFTWARE\CopyPasta");
+                    if (key != null)
+                    {
+                        var version = key.GetValue("Version")?.ToString();
+                        if (!string.IsNullOrEmpty(version))
+                        {
+                            return version;
+                        }
+                    }
+                }
+                catch
+                {
+                    // Registry access might fail due to permissions, try other methods
+                }
+
+                // Priority 2: Try to get version from file version info
+                var assembly = Assembly.GetExecutingAssembly();
+                var fileVersionInfo = FileVersionInfo.GetVersionInfo(assembly.Location);
+                if (!string.IsNullOrEmpty(fileVersionInfo.FileVersion) && fileVersionInfo.FileVersion != "1.0.0.0")
+                {
+                    return fileVersionInfo.FileVersion;
+                }
+
+                // Priority 3: Try to get version from assembly (least reliable for installed apps)
+                var version = assembly.GetName().Version;
+                if (version != null && version.ToString() != "0.0.0.0" && version.ToString() != "1.0.0.0")
+                {
+                    return version.ToString();
+                }
+
+                // Priority 4: Fallback to uninstall registry entries
                 try
                 {
                     using var key = Registry.LocalMachine.OpenSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\CopyPasta");
@@ -134,10 +167,10 @@ namespace CopyPasta
                 }
                 catch
                 {
-                    // Registry access might fail due to permissions, try other methods
+                    // Registry access might fail due to permissions
                 }
 
-                // Priority 2: Try current user registry
+                // Priority 5: Try current user registry
                 try
                 {
                     using var key = Registry.CurrentUser.OpenSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\CopyPasta");
@@ -153,21 +186,6 @@ namespace CopyPasta
                 catch
                 {
                     // Registry access might fail
-                }
-
-                // Priority 3: Try to get version from file version info
-                var assembly = Assembly.GetExecutingAssembly();
-                var fileVersionInfo = FileVersionInfo.GetVersionInfo(assembly.Location);
-                if (!string.IsNullOrEmpty(fileVersionInfo.FileVersion) && fileVersionInfo.FileVersion != "1.0.0.0")
-                {
-                    return fileVersionInfo.FileVersion;
-                }
-
-                // Priority 4: Try to get version from assembly (least reliable for installed apps)
-                var version = assembly.GetName().Version;
-                if (version != null && version.ToString() != "0.0.0.0" && version.ToString() != "1.0.0.0")
-                {
-                    return version.ToString();
                 }
             }
             catch (Exception ex)

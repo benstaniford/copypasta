@@ -48,6 +48,9 @@
             <RegistryKey Root="HKLM" Key="SOFTWARE\Microsoft\Windows\CurrentVersion\Run">
               <RegistryValue Name="CopyPasta" Type="string" Value="[INSTALLFOLDER]CopyPasta.exe" />
             </RegistryKey>
+            <RegistryKey Root="HKLM" Key="SOFTWARE\CopyPasta">
+              <RegistryValue Name="Version" Type="string" Value="!(bind.FileVersion.CopyPasta.exe)" KeyPath="yes" />
+            </RegistryKey>
           </Component>
           <Component Id="PathEnvironmentVariable" Guid="*">
             <Environment Id="PATH" Name="PATH" Value="[INSTALLFOLDER]" Permanent="no" Part="last" Action="set" System="yes" />
