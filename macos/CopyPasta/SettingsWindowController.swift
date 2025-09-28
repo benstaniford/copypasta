@@ -40,7 +40,7 @@ class SettingsWindowController: NSWindowController {
         let settingsView = SettingsView(
             settings: settings,
             onTestConnection: { [weak self] in
-                await self?.testConnection()
+                return await self?.testConnection() ?? false
             },
             onSave: { [weak self] in
                 self?.saveSettings()

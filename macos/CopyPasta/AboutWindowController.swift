@@ -110,8 +110,13 @@ struct LinkButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .foregroundColor(.blue)
-            .underline()
             .font(.caption)
             .opacity(configuration.isPressed ? 0.7 : 1.0)
+            .overlay(
+                Rectangle()
+                    .frame(height: 1)
+                    .offset(y: 1),
+                alignment: .bottom
+            )
     }
 }
