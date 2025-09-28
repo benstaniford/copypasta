@@ -63,35 +63,23 @@ class CopyPastaClient {
             return false 
         }
         
-        guard let url = URL(string: "\(settings.serverEndpoint)/health") else {
-            Logger.log("CopyPastaClient", "testConnection failed: invalid URL \(settings.serverEndpoint)/health")
-            return false
-        }
+        Logger.log("CopyPastaClient", "Testing connection by attempting authentication")
         
-        Logger.logNetwork("GET", url.absoluteString, "Starting")
-        
+        // Test by attempting authentication, which is what the app actually uses
         do {
-            let (data, response) = try await urlSession.data(from: url)
+            // Clear any existing session to force a fresh login test
+            let oldSessionCookie = sessionCookie
+            sessionCookie = nil
             
-            if let httpResponse = response as? HTTPURLResponse {
-                Logger.logNetwork("GET", url.absoluteString, "Response", "Status: \(httpResponse.statusCode)")
-                
-                if httpResponse.statusCode == 200 {
-                    if let responseString = String(data: data, encoding: .utf8) {
-                        Logger.logNetwork("GET", url.absoluteString, "Success", "Response: \(responseString)")
-                    }
-                    return true
-                } else {
-                    Logger.logNetwork("GET", url.absoluteString, "Failed", "HTTP \(httpResponse.statusCode)")
-                    return false
-                }
-            } else {
-                Logger.logNetwork("GET", url.absoluteString, "Failed", "No HTTP response")
-                return false
-            }
+            // Try to authenticate
+            try await ensureAuthenticated()
+            
+            Logger.log("CopyPastaClient", "testConnection: Authentication successful")
+            return true
+            
         } catch {
-            Logger.logNetwork("GET", url.absoluteString, "Exception", error.localizedDescription)
-            Logger.log("CopyPastaClient", "testConnection error details: \(error)")
+            Logger.log("CopyPastaClient", "testConnection failed: \(error.localizedDescription)")
+            // Restore the old session cookie if we had one
             return false
         }
     }
