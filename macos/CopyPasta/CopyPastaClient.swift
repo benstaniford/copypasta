@@ -22,7 +22,7 @@ class CopyPastaClient {
     }()
     
     init() {
-        clientId = generateClientId()
+        self.clientId = CopyPastaClient.generateClientId()
         Logger.log("CopyPastaClient", "Initialized with client ID: \(clientId)")
     }
     
@@ -228,7 +228,7 @@ class CopyPastaClient {
         }
     }
     
-    private func generateClientId() -> String {
+    private static func generateClientId() -> String {
         let hostName = Host.current().name ?? "unknown"
         let userName = NSUserName()
         let randomPart = String(UUID().uuidString.prefix(8))
