@@ -24,7 +24,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             print("CopyPasta: Starting setup on main thread")
             NSLog("CopyPasta: Starting setup on main thread")
             self.setupApplication()
+            print("CopyPasta: setupApplication completed, about to call startServices")
+            NSLog("CopyPasta: setupApplication completed, about to call startServices")
             self.startServices()
+            print("CopyPasta: startServices completed")
+            NSLog("CopyPasta: startServices completed")
             Logger.log("AppDelegate", "Application startup complete")
         }
     }
@@ -78,9 +82,16 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
     
     private func startServices() {
+        print("CopyPasta: startServices() called")
+        NSLog("CopyPasta: startServices() called")
         Logger.log("AppDelegate", "Loading settings...")
+        
         // Load settings and start client if configured
+        print("CopyPasta: About to access Settings.shared")
+        NSLog("CopyPasta: About to access Settings.shared")
         let settings = Settings.shared
+        print("CopyPasta: Settings.shared accessed successfully")
+        NSLog("CopyPasta: Settings.shared accessed successfully")
         
         Logger.log("AppDelegate", "Settings configured: \(settings.isConfigured)")
         if settings.isConfigured {
