@@ -14,6 +14,7 @@ namespace CopyPasta
         private Label _passwordLabel = null!;
         private TextBox _passwordTextBox = null!;
         private CheckBox _autoStartCheckBox = null!;
+        private CheckBox _toastNotificationsCheckBox = null!;
         private Button _testConnectionButton = null!;
         private Button _okButton = null!;
         private Button _cancelButton = null!;
@@ -29,7 +30,7 @@ namespace CopyPasta
         private void InitializeComponent()
         {
             Text = "CopyPasta Settings";
-            Size = new Size(400, 320);
+            Size = new Size(400, 350);
             StartPosition = FormStartPosition.CenterScreen;
             FormBorderStyle = FormBorderStyle.FixedDialog;
             MaximizeBox = false;
@@ -91,11 +92,19 @@ namespace CopyPasta
                 Size = new Size(150, 23)
             };
 
+            // Toast notifications
+            _toastNotificationsCheckBox = new CheckBox
+            {
+                Text = "Show toast notifications",
+                Location = new Point(12, 210),
+                Size = new Size(180, 23)
+            };
+
             // Test connection button
             _testConnectionButton = new Button
             {
                 Text = "Test Connection",
-                Location = new Point(12, 210),
+                Location = new Point(12, 240),
                 Size = new Size(120, 30)
             };
             _testConnectionButton.Click += TestConnectionButton_Click;
@@ -103,7 +112,7 @@ namespace CopyPasta
             // Status label
             _statusLabel = new Label
             {
-                Location = new Point(140, 210),
+                Location = new Point(140, 240),
                 Size = new Size(222, 30),
                 TextAlign = ContentAlignment.MiddleLeft,
                 ForeColor = Color.Green
@@ -113,7 +122,7 @@ namespace CopyPasta
             _okButton = new Button
             {
                 Text = "OK",
-                Location = new Point(207, 250),
+                Location = new Point(207, 280),
                 Size = new Size(75, 30),
                 DialogResult = DialogResult.OK
             };
@@ -123,7 +132,7 @@ namespace CopyPasta
             _cancelButton = new Button
             {
                 Text = "Cancel",
-                Location = new Point(287, 250),
+                Location = new Point(287, 280),
                 Size = new Size(75, 30),
                 DialogResult = DialogResult.Cancel
             };
@@ -137,6 +146,7 @@ namespace CopyPasta
                 _passwordLabel,
                 _passwordTextBox,
                 _autoStartCheckBox,
+                _toastNotificationsCheckBox,
                 _testConnectionButton,
                 _statusLabel,
                 _okButton,
@@ -153,6 +163,7 @@ namespace CopyPasta
             _usernameTextBox.Text = _settings.Username;
             _passwordTextBox.Text = _settings.Password;
             _autoStartCheckBox.Checked = _settings.AutoStart;
+            _toastNotificationsCheckBox.Checked = _settings.ShowToastNotifications;
         }
 
         private async void TestConnectionButton_Click(object? sender, EventArgs e)
@@ -223,6 +234,7 @@ namespace CopyPasta
             _settings.Username = _usernameTextBox.Text;
             _settings.Password = _passwordTextBox.Text;
             _settings.AutoStart = _autoStartCheckBox.Checked;
+            _settings.ShowToastNotifications = _toastNotificationsCheckBox.Checked;
 
             DialogResult = DialogResult.OK;
             Close();

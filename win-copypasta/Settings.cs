@@ -18,6 +18,7 @@ namespace CopyPasta
         public string Username { get; set; } = "";
         public string Password { get; set; } = "";
         public bool AutoStart { get; set; } = false;
+        public bool ShowToastNotifications { get; set; } = true;
 
         [JsonIgnore]
         public bool IsConfigured => !string.IsNullOrWhiteSpace(ServerEndpoint) &&

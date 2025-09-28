@@ -152,7 +152,10 @@ namespace CopyPasta
 
         private void UpdateTrayIcon(string message, ToolTipIcon icon)
         {
-            _trayIcon.ShowBalloonTip(3000, "CopyPasta", message, icon);
+            if (_settings.ShowToastNotifications)
+            {
+                _trayIcon.ShowBalloonTip(3000, "CopyPasta", message, icon);
+            }
         }
 
         private void TrayIcon_DoubleClick(object? sender, EventArgs e)
