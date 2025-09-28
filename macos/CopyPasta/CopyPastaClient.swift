@@ -22,8 +22,11 @@ class CopyPastaClient {
     }()
     
     init() {
+        NSLog("CopyPastaClient: init() started")
         self.clientId = CopyPastaClient.generateClientId()
+        NSLog("CopyPastaClient: clientId generated: \(clientId)")
         Logger.log("CopyPastaClient", "Initialized with client ID: \(clientId)")
+        NSLog("CopyPastaClient: init() completed")
     }
     
     deinit {

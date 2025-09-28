@@ -20,6 +20,11 @@ class ClipboardMonitor {
     private var timer: Timer?
     private var isUpdatingFromServer = false
     
+    init() {
+        NSLog("ClipboardMonitor: init() started")
+        NSLog("ClipboardMonitor: init() completed")
+    }
+    
     func startMonitoring() {
         Logger.log("ClipboardMonitor", "=== START MONITORING CALLED ===")
         print("ClipboardMonitor: startMonitoring() called")

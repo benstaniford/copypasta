@@ -58,13 +58,19 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         Logger.log("AppDelegate", "Initializing CopyPasta client...")
         // Initialize client
         print("CopyPasta: About to create CopyPastaClient")
+        NSLog("CopyPasta: About to create CopyPastaClient")
         copyPastaClient = CopyPastaClient()
+        print("CopyPasta: CopyPastaClient created, setting delegate")
+        NSLog("CopyPasta: CopyPastaClient created, setting delegate")
         copyPastaClient.delegate = self
         
         Logger.log("AppDelegate", "Initializing clipboard monitor...")
         // Initialize clipboard monitor
         print("CopyPasta: About to create ClipboardMonitor")
+        NSLog("CopyPasta: About to create ClipboardMonitor")
         clipboardMonitor = ClipboardMonitor()
+        print("CopyPasta: ClipboardMonitor created, setting delegate")
+        NSLog("CopyPasta: ClipboardMonitor created, setting delegate")
         clipboardMonitor.delegate = self
         
         print("CopyPasta: All components created successfully")
