@@ -119,22 +119,7 @@ namespace CopyPasta
         {
             try
             {
-                // Try to get version from assembly first
-                var assembly = Assembly.GetExecutingAssembly();
-                var version = assembly.GetName().Version;
-                if (version != null && version.ToString() != "0.0.0.0")
-                {
-                    return version.ToString();
-                }
-
-                // Fallback: Try to get version from file version info
-                var fileVersionInfo = FileVersionInfo.GetVersionInfo(assembly.Location);
-                if (!string.IsNullOrEmpty(fileVersionInfo.FileVersion))
-                {
-                    return fileVersionInfo.FileVersion;
-                }
-
-                // Fallback: Try to get from registry (installer version)
+                // Priority 1: Try to get from registry (installer version) - most accurate
                 try
                 {
                     using var key = Registry.LocalMachine.OpenSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\CopyPasta");
@@ -149,10 +134,10 @@ namespace CopyPasta
                 }
                 catch
                 {
-                    // Registry access might fail due to permissions
+                    // Registry access might fail due to permissions, try other methods
                 }
 
-                // Final fallback: Try current user registry
+                // Priority 2: Try current user registry
                 try
                 {
                     using var key = Registry.CurrentUser.OpenSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\CopyPasta");
@@ -168,6 +153,21 @@ namespace CopyPasta
                 catch
                 {
                     // Registry access might fail
+                }
+
+                // Priority 3: Try to get version from file version info
+                var assembly = Assembly.GetExecutingAssembly();
+                var fileVersionInfo = FileVersionInfo.GetVersionInfo(assembly.Location);
+                if (!string.IsNullOrEmpty(fileVersionInfo.FileVersion) && fileVersionInfo.FileVersion != "1.0.0.0")
+                {
+                    return fileVersionInfo.FileVersion;
+                }
+
+                // Priority 4: Try to get version from assembly (least reliable for installed apps)
+                var version = assembly.GetName().Version;
+                if (version != null && version.ToString() != "0.0.0.0" && version.ToString() != "1.0.0.0")
+                {
+                    return version.ToString();
                 }
             }
             catch (Exception ex)
