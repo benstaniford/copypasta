@@ -9,7 +9,14 @@ class AccessibilityPermissionManager {
     
     /// Check if accessibility permissions are granted
     func hasAccessibilityPermissions() -> Bool {
-        return AXIsProcessTrusted()
+        let result = AXIsProcessTrusted()
+        Logger.log("AccessibilityPermissionManager", "AXIsProcessTrusted() returned: \(result)")
+        
+        // Also check with options to see if that makes a difference
+        let resultWithOptions = AXIsProcessTrustedWithOptions(nil)
+        Logger.log("AccessibilityPermissionManager", "AXIsProcessTrustedWithOptions(nil) returned: \(resultWithOptions)")
+        
+        return result
     }
     
     /// Request accessibility permissions and show dialog if needed

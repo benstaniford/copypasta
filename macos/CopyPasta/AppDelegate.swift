@@ -112,6 +112,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             Logger.log("AppDelegate", "All services started")
         } else {
             Logger.log("AppDelegate", "Accessibility permissions not granted, setting up permission monitoring...")
+            
+            // Since you've confirmed permissions are granted in System Settings, let's try starting anyway
+            Logger.log("AppDelegate", "Attempting to start clipboard monitoring despite permission check...")
+            clipboardMonitor.startMonitoring()
+            
             // Start periodic check for when permissions are granted
             AccessibilityPermissionManager.shared.startPeriodicCheck { [weak self] in
                 Logger.log("AppDelegate", "Accessibility permissions granted, starting clipboard monitoring...")
