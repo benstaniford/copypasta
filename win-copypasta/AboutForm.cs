@@ -83,7 +83,7 @@ namespace CopyPasta
             // GitHub link
             _githubLinkLabel = new LinkLabel
             {
-                Text = "View Source Code on GitHub",
+                Text = "See Latest Version on GitHub",
                 Location = new Point(20, 165),
                 Size = new Size(310, 20),
                 TextAlign = ContentAlignment.MiddleCenter,
