@@ -7,6 +7,7 @@ WORKDIR /app
 # Install build dependencies for compiling Python packages
 RUN apt-get update && apt-get install -y \
     gcc \
+    git \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements and install Python dependencies
@@ -19,14 +20,21 @@ FROM python:3.11-slim
 # Set working directory
 WORKDIR /app
 
-# No additional runtime dependencies needed for basic Flask app
+# Install git for version detection
+RUN apt-get update && apt-get install -y \
+    git \
+    && rm -rf /var/lib/apt/lists/*
 
 # Copy Python packages from builder stage
 COPY --from=builder /root/.local /usr/local
 
+# Copy git repository for version detection
+COPY .git/ .git/
+
 # Copy application code
 COPY app.py .
 COPY database.py .
+COPY version.py .
 COPY gunicorn.conf.py .
 COPY templates/ templates/
 

@@ -1,11 +1,13 @@
 from flask import Flask, render_template, jsonify, request, session, redirect, url_for
 import os
+import logging
 from functools import wraps
 import base64
 from datetime import datetime, timedelta
 from database import init_db, save_clipboard_entry, get_clipboard_entry, get_clipboard_history, get_clipboard_version, wait_for_clipboard_change, authenticate_user, create_user
 from PIL import Image
 import io
+from version import get_cached_version, get_numeric_version
 
 app = Flask(__name__)
 
@@ -14,8 +16,18 @@ app.secret_key = os.environ.get('SECRET_KEY', 'your-secret-key-change-this-in-pr
 # Configure session to be permanent and last forever
 app.permanent_session_lifetime = timedelta(days=365 * 10)  # 10 years
 
+# Setup logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# Get and log application version
+app_version = get_cached_version()
+numeric_version = get_numeric_version(app_version)
+logger.info(f"🚀 CopyPasta v{numeric_version} starting up...")
+
 # Initialize database on startup
 init_db()
+logger.info("📋 Database initialized successfully")
 
 def login_required(f):
     """Decorator to require authentication for routes"""
@@ -250,7 +262,21 @@ def poll_clipboard():
 @app.route('/health')
 def health_check():
     """Health check endpoint"""
-    return jsonify({'status': 'healthy'})
+    return jsonify({
+        'status': 'healthy',
+        'version': numeric_version,
+        'app_name': 'CopyPasta'
+    })
+
+@app.route('/api/version')
+def api_version():
+    """Version information endpoint"""
+    return jsonify({
+        'version': numeric_version,
+        'full_version': app_version,
+        'app_name': 'CopyPasta',
+        'status': 'success'
+    })
 
 if __name__ == '__main__':
     # For development only - use gunicorn in production

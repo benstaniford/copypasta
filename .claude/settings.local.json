@@ -29,7 +29,10 @@
       "Bash(docker exec:*)",
       "Bash(docker system prune:*)",
       "Bash(docker tag:*)",
-      "Bash(docker rm:*)"
+      "Bash(docker rm:*)",
+      "Bash(git tag:*)",
+      "Bash(git describe:*)",
+      "Bash(timeout:*)"
     ],
     "deny": [],
     "ask": []
