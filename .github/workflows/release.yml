@@ -256,15 +256,22 @@ jobs:
           $env:PATH += ";C:\Program Files (x86)\WiX Toolset v3.11\bin"
           msbuild win-copypasta/CopyPasta.Installer/CopyPasta.Installer.wixproj /p:Configuration=Release /p:Platform=x86
 
-      - name: Verify MSI exists
+      - name: Verify and rename MSI file
         run: |
-          $msiPath = "win-copypasta/CopyPasta.Installer/bin/Release/CopyPastaInstaller.msi"
-          if (Test-Path $msiPath) {
-            Write-Host "✓ MSI file found: $msiPath"
-            $size = (Get-Item $msiPath).Length
+          $originalPath = "win-copypasta/CopyPasta.Installer/bin/Release/CopyPastaInstaller.msi"
+          $version = "${{ steps.version.outputs.NUMERIC_VERSION }}"
+          $newPath = "win-copypasta/CopyPasta.Installer/bin/Release/CopyPastaInstaller-v$version.msi"
+          
+          if (Test-Path $originalPath) {
+            Write-Host "✓ MSI file found: $originalPath"
+            $size = (Get-Item $originalPath).Length
             Write-Host "✓ MSI size: $([math]::Round($size / 1MB, 2)) MB"
+            
+            # Rename the file to include version
+            Rename-Item $originalPath $newPath
+            Write-Host "✓ MSI renamed to: $newPath"
           } else {
-            Write-Host "✗ MSI file not found: $msiPath"
+            Write-Host "✗ MSI file not found: $originalPath"
             Get-ChildItem win-copypasta/CopyPasta.Installer/bin -Recurse
             exit 1
           }
@@ -273,7 +280,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: copypasta-windows
-          path: win-copypasta/CopyPasta.Installer/bin/Release/CopyPastaInstaller.msi
+          path: win-copypasta/CopyPasta.Installer/bin/Release/CopyPastaInstaller-v${{ steps.version.outputs.NUMERIC_VERSION }}.msi
 
   build-macos:
     runs-on: macos-latest
@@ -504,11 +511,10 @@ jobs:
         run: |
           VERSION="${{ steps.version.outputs.VERSION }}"
           NUMERIC_VERSION="${{ steps.version.outputs.NUMERIC_VERSION }}"
-          WINDOWS_ASSET="artifacts/copypasta-windows/CopyPastaInstaller.msi"
-          WINDOWS_RELEASE_NAME="CopyPastaInstaller-v${NUMERIC_VERSION}.msi"
+          WINDOWS_ASSET="artifacts/copypasta-windows/CopyPastaInstaller-v${NUMERIC_VERSION}.msi"
           
           echo "Uploading Windows MSI to release..."
-          gh release upload "$VERSION" "$WINDOWS_ASSET#$WINDOWS_RELEASE_NAME" --clobber
+          gh release upload "$VERSION" "$WINDOWS_ASSET" --clobber
           echo "✓ Windows MSI uploaded successfully"
 
       - name: Upload macOS DMG
