@@ -25,7 +25,8 @@
       "Bash(chmod:*)",
       "Bash(grep:*)",
       "Bash(xcodebuild:*)",
-      "Bash(find:*)"
+      "Bash(find:*)",
+      "Bash(docker exec:*)"
     ],
     "deny": [],
     "ask": []

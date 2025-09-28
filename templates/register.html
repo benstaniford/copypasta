@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CopyPasta - Login</title>
+    <title>CopyPasta - Register</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -15,7 +15,7 @@
             margin: 0;
             padding: 1rem;
         }
-        .login-container {
+        .register-container {
             background: white;
             padding: 2rem;
             border-radius: 8px;
@@ -23,7 +23,7 @@
             width: 100%;
             max-width: 400px;
         }
-        .login-header {
+        .register-header {
             text-align: center;
             margin-bottom: 2rem;
         }
@@ -67,7 +67,7 @@
             border-color: #667eea;
             box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.2);
         }
-        .login-button {
+        .register-button {
             width: 100%;
             padding: 0.75rem;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -77,32 +77,33 @@
             font-size: 1rem;
             cursor: pointer;
             transition: transform 0.2s ease;
+            margin-bottom: 1rem;
         }
-        .login-button:hover {
+        .register-button:hover {
             transform: translateY(-1px);
         }
-        .login-button:active {
+        .register-button:active {
             transform: translateY(0);
         }
-        .register-link {
+        .login-link {
             text-align: center;
             margin-top: 1rem;
         }
-        .register-link a {
+        .login-link a {
             color: #667eea;
             text-decoration: none;
             font-weight: 500;
         }
-        .register-link a:hover {
+        .login-link a:hover {
             text-decoration: underline;
         }
     </style>
 </head>
 <body>
-    <div class="login-container">
-        <div class="login-header">
+    <div class="register-container">
+        <div class="register-header">
             <h1>CopyPasta</h1>
-            <p>Sign in to access cross-device clipboard</p>
+            <p>Create your account</p>
         </div>
 
         {% if error %}
@@ -111,7 +112,7 @@
         </div>
         {% endif %}
 
-        <form class="login-form" method="POST">
+        <form class="register-form" method="POST">
             <div class="form-group">
                 <label for="username" class="form-label">Username</label>
                 <input 
@@ -121,7 +122,8 @@
                     class="form-input" 
                     required 
                     autocomplete="username"
-                    placeholder="Enter your username"
+                    placeholder="Choose a username"
+                    value="{{ request.form.get('username', '') }}"
                 >
             </div>
 
@@ -133,18 +135,31 @@
                     name="password" 
                     class="form-input" 
                     required 
-                    autocomplete="current-password"
-                    placeholder="Enter your password"
+                    autocomplete="new-password"
+                    placeholder="Choose a password (min 4 characters)"
                 >
             </div>
 
-            <button type="submit" class="login-button">
-                Sign In
+            <div class="form-group">
+                <label for="confirm_password" class="form-label">Confirm Password</label>
+                <input 
+                    type="password" 
+                    id="confirm_password" 
+                    name="confirm_password" 
+                    class="form-input" 
+                    required 
+                    autocomplete="new-password"
+                    placeholder="Confirm your password"
+                >
+            </div>
+
+            <button type="submit" class="register-button">
+                Create Account
             </button>
         </form>
 
-        <div class="register-link">
-            Don't have an account? <a href="{{ url_for('register') }}">Create one here</a>
+        <div class="login-link">
+            Already have an account? <a href="{{ url_for('login') }}">Sign in here</a>
         </div>
     </div>
 
@@ -154,17 +169,22 @@
             document.getElementById('username').focus();
         });
 
-        // Handle form submission with Enter key
-        document.addEventListener('keydown', function(e) {
-            if (e.key === 'Enter') {
-                const form = document.querySelector('.login-form');
-                const username = document.getElementById('username').value;
-                const password = document.getElementById('password').value;
-                
-                if (username && password) {
-                    form.submit();
-                }
+        // Simple client-side password confirmation check
+        document.getElementById('confirm_password').addEventListener('blur', function() {
+            const password = document.getElementById('password').value;
+            const confirmPassword = this.value;
+            
+            if (password && confirmPassword && password !== confirmPassword) {
+                this.setCustomValidity('Passwords do not match');
+            } else {
+                this.setCustomValidity('');
             }
+        });
+
+        // Reset validation on password change
+        document.getElementById('password').addEventListener('input', function() {
+            const confirmPassword = document.getElementById('confirm_password');
+            confirmPassword.setCustomValidity('');
         });
     </script>
 </body>

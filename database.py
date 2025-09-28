@@ -4,6 +4,8 @@ from datetime import datetime
 import base64
 import threading
 import time
+import hashlib
+import secrets
 
 DATABASE_PATH = os.path.join(os.path.dirname(__file__), 'clipboard.db')
 
@@ -16,25 +18,46 @@ def init_db():
     conn = sqlite3.connect(DATABASE_PATH)
     cursor = conn.cursor()
     
+    # Create users table
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT UNIQUE NOT NULL,
+            password_hash TEXT NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+    
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS clipboard_entries (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
             content_type TEXT NOT NULL,
             content TEXT NOT NULL,
             metadata TEXT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             version INTEGER DEFAULT 1,
-            client_id TEXT
+            client_id TEXT,
+            FOREIGN KEY (user_id) REFERENCES users (id)
         )
     ''')
     
-    # Create metadata table for global version counter
+    # Create metadata table for per-user version counters
     cursor.execute('''
-        CREATE TABLE IF NOT EXISTS app_metadata (
-            key TEXT PRIMARY KEY,
-            value INTEGER NOT NULL
+        CREATE TABLE IF NOT EXISTS user_metadata (
+            user_id INTEGER NOT NULL,
+            key TEXT NOT NULL,
+            value INTEGER NOT NULL,
+            PRIMARY KEY (user_id, key),
+            FOREIGN KEY (user_id) REFERENCES users (id)
         )
     ''')
+    
+    # Migration: Add user_id column if it doesn't exist
+    try:
+        cursor.execute('ALTER TABLE clipboard_entries ADD COLUMN user_id INTEGER')
+    except sqlite3.OperationalError:
+        pass  # Column already exists
     
     # Migration: Add new columns if they don't exist
     try:
@@ -47,22 +70,24 @@ def init_db():
     except sqlite3.OperationalError:
         pass  # Column already exists
     
-    # Initialize version counter in database if not exists
-    cursor.execute('INSERT OR IGNORE INTO app_metadata (key, value) VALUES ("clipboard_version", 0)')
+    # Create default user from environment variables if it doesn't exist
+    default_username = os.environ.get('APP_USERNAME', 'user')
+    default_password = os.environ.get('APP_PASSWORD', 'password')
+    create_user_if_not_exists(default_username, default_password)
     
     conn.commit()
     conn.close()
 
-def clear_clipboard():
-    """Remove all existing clipboard entries"""
+def clear_clipboard(user_id):
+    """Remove all existing clipboard entries for a user"""
     conn = sqlite3.connect(DATABASE_PATH)
     cursor = conn.cursor()
-    cursor.execute('DELETE FROM clipboard_entries')
+    cursor.execute('DELETE FROM clipboard_entries WHERE user_id = ?', (user_id,))
     conn.commit()
     conn.close()
 
-def save_clipboard_entry(content_type, content, metadata=None, client_id=None):
-    """Save a new clipboard entry, removing any existing ones"""
+def save_clipboard_entry(user_id, content_type, content, metadata=None, client_id=None):
+    """Save a new clipboard entry for a user, removing any existing ones for that user"""
     conn = sqlite3.connect(DATABASE_PATH)
     cursor = conn.cursor()
     
@@ -70,25 +95,24 @@ def save_clipboard_entry(content_type, content, metadata=None, client_id=None):
         # Start transaction for atomic operation
         cursor.execute('BEGIN IMMEDIATE')
         
-        # Clear existing entries
-        cursor.execute('DELETE FROM clipboard_entries')
+        # Clear existing entries for this user
+        cursor.execute('DELETE FROM clipboard_entries WHERE user_id = ?', (user_id,))
         
-        # Increment version counter atomically
+        # Increment version counter for this user
         cursor.execute('''
-            UPDATE app_metadata 
-            SET value = value + 1 
-            WHERE key = "clipboard_version"
-        ''')
+            INSERT OR REPLACE INTO user_metadata (user_id, key, value)
+            VALUES (?, "clipboard_version", COALESCE((SELECT value FROM user_metadata WHERE user_id = ? AND key = "clipboard_version"), 0) + 1)
+        ''', (user_id, user_id))
         
         # Get the new version
-        cursor.execute('SELECT value FROM app_metadata WHERE key = "clipboard_version"')
+        cursor.execute('SELECT value FROM user_metadata WHERE user_id = ? AND key = "clipboard_version"', (user_id,))
         version = cursor.fetchone()[0]
         
         # Insert new clipboard entry
         cursor.execute('''
-            INSERT INTO clipboard_entries (content_type, content, metadata, created_at, version, client_id)
-            VALUES (?, ?, ?, ?, ?, ?)
-        ''', (content_type, content, metadata, datetime.now().isoformat(), version, client_id))
+            INSERT INTO clipboard_entries (user_id, content_type, content, metadata, created_at, version, client_id)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        ''', (user_id, content_type, content, metadata, datetime.now().isoformat(), version, client_id))
         
         # Commit transaction
         conn.commit()
@@ -103,17 +127,18 @@ def save_clipboard_entry(content_type, content, metadata=None, client_id=None):
     with _clipboard_changed_condition:
         _clipboard_changed_condition.notify_all()
 
-def get_clipboard_entry():
-    """Get the current clipboard entry"""
+def get_clipboard_entry(user_id):
+    """Get the current clipboard entry for a user"""
     conn = sqlite3.connect(DATABASE_PATH)
     cursor = conn.cursor()
     
     cursor.execute('''
         SELECT content_type, content, metadata, created_at, version, client_id
         FROM clipboard_entries
+        WHERE user_id = ?
         ORDER BY created_at DESC
         LIMIT 1
-    ''')
+    ''', (user_id,))
     
     result = cursor.fetchone()
     conn.close()
@@ -129,25 +154,25 @@ def get_clipboard_entry():
         }
     return None
 
-def get_clipboard_version():
-    """Get the current clipboard version from database"""
+def get_clipboard_version(user_id):
+    """Get the current clipboard version for a user from database"""
     conn = sqlite3.connect(DATABASE_PATH)
     cursor = conn.cursor()
-    cursor.execute('SELECT value FROM app_metadata WHERE key = "clipboard_version"')
+    cursor.execute('SELECT value FROM user_metadata WHERE user_id = ? AND key = "clipboard_version"', (user_id,))
     result = cursor.fetchone()
     conn.close()
     return result[0] if result else 0
 
-def wait_for_clipboard_change(last_version, timeout=30):
-    """Wait for clipboard to change from last_version, with timeout"""
+def wait_for_clipboard_change(user_id, last_version, timeout=30):
+    """Wait for clipboard to change from last_version for a user, with timeout"""
     start_time = time.time()
     
     with _clipboard_changed_condition:
         while time.time() - start_time < timeout:
             # Check current version from database
-            current_version = get_clipboard_version()
+            current_version = get_clipboard_version(user_id)
             if current_version > last_version:
-                return get_clipboard_entry()
+                return get_clipboard_entry(user_id)
             
             # Calculate remaining timeout
             remaining_timeout = timeout - (time.time() - start_time)
@@ -158,3 +183,78 @@ def wait_for_clipboard_change(last_version, timeout=30):
             _clipboard_changed_condition.wait(timeout=min(remaining_timeout, 0.5))
         
     return None  # Timeout
+
+def hash_password(password):
+    """Hash a password using SHA-256 with salt"""
+    salt = secrets.token_hex(16)
+    password_hash = hashlib.sha256((salt + password).encode()).hexdigest()
+    return f"{salt}:{password_hash}"
+
+def verify_password(password, stored_hash):
+    """Verify a password against stored hash"""
+    try:
+        salt, hash_value = stored_hash.split(':')
+        password_hash = hashlib.sha256((salt + password).encode()).hexdigest()
+        return password_hash == hash_value
+    except ValueError:
+        return False
+
+def create_user(username, password):
+    """Create a new user"""
+    password_hash = hash_password(password)
+    conn = sqlite3.connect(DATABASE_PATH)
+    cursor = conn.cursor()
+    
+    try:
+        cursor.execute('''
+            INSERT INTO users (username, password_hash, created_at)
+            VALUES (?, ?, ?)
+        ''', (username, password_hash, datetime.now().isoformat()))
+        
+        user_id = cursor.lastrowid
+        
+        # Initialize version counter for new user
+        cursor.execute('''
+            INSERT INTO user_metadata (user_id, key, value)
+            VALUES (?, "clipboard_version", 0)
+        ''', (user_id,))
+        
+        conn.commit()
+        return user_id
+        
+    except sqlite3.IntegrityError:
+        conn.rollback()
+        raise ValueError("Username already exists")
+    except Exception as e:
+        conn.rollback()
+        raise e
+    finally:
+        conn.close()
+
+def create_user_if_not_exists(username, password):
+    """Create a user if it doesn't exist, return user_id"""
+    user_id = get_user_id(username)
+    if user_id is None:
+        return create_user(username, password)
+    return user_id
+
+def get_user_id(username):
+    """Get user ID by username"""
+    conn = sqlite3.connect(DATABASE_PATH)
+    cursor = conn.cursor()
+    cursor.execute('SELECT id FROM users WHERE username = ?', (username,))
+    result = cursor.fetchone()
+    conn.close()
+    return result[0] if result else None
+
+def authenticate_user(username, password):
+    """Authenticate a user and return user_id if successful"""
+    conn = sqlite3.connect(DATABASE_PATH)
+    cursor = conn.cursor()
+    cursor.execute('SELECT id, password_hash FROM users WHERE username = ?', (username,))
+    result = cursor.fetchone()
+    conn.close()
+    
+    if result and verify_password(password, result[1]):
+        return result[0]
+    return None

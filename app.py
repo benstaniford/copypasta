@@ -3,15 +3,12 @@ import os
 from functools import wraps
 import base64
 from datetime import datetime, timedelta
-from database import init_db, save_clipboard_entry, get_clipboard_entry, get_clipboard_version, wait_for_clipboard_change
+from database import init_db, save_clipboard_entry, get_clipboard_entry, get_clipboard_version, wait_for_clipboard_change, authenticate_user, create_user
 from PIL import Image
 import io
 
 app = Flask(__name__)
 
-# Get authentication credentials from environment variables
-USERNAME = os.environ.get('APP_USERNAME', 'user')
-PASSWORD = os.environ.get('APP_PASSWORD', 'password')
 app.secret_key = os.environ.get('SECRET_KEY', 'your-secret-key-change-this-in-production')
 
 # Configure session to be permanent and last forever
@@ -24,7 +21,7 @@ def login_required(f):
     """Decorator to require authentication for routes"""
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        if not session.get('authenticated'):
+        if not session.get('user_id'):
             return redirect(url_for('login'))
         return f(*args, **kwargs)
     return decorated_function
@@ -37,9 +34,11 @@ def login():
         username = request.form.get('username')
         password = request.form.get('password')
         
-        if username == USERNAME and password == PASSWORD:
+        user_id = authenticate_user(username, password)
+        if user_id:
             session.permanent = True
-            session['authenticated'] = True
+            session['user_id'] = user_id
+            session['username'] = username
             next_page = request.args.get('next')
             return redirect(next_page) if next_page else redirect(url_for('index'))
         else:
@@ -47,10 +46,39 @@ def login():
     
     return render_template('login.html')
 
+@app.route('/register', methods=['GET', 'POST'])
+def register():
+    """Registration page"""
+    if request.method == 'POST':
+        username = request.form.get('username')
+        password = request.form.get('password')
+        confirm_password = request.form.get('confirm_password')
+        
+        if not username or not password:
+            return render_template('register.html', error='Username and password are required')
+        
+        if password != confirm_password:
+            return render_template('register.html', error='Passwords do not match')
+        
+        if len(password) < 4:
+            return render_template('register.html', error='Password must be at least 4 characters long')
+        
+        try:
+            user_id = create_user(username, password)
+            session.permanent = True
+            session['user_id'] = user_id
+            session['username'] = username
+            return redirect(url_for('index'))
+        except ValueError as e:
+            return render_template('register.html', error=str(e))
+    
+    return render_template('register.html')
+
 @app.route('/logout')
 def logout():
     """Logout and clear session"""
-    session.pop('authenticated', None)
+    session.pop('user_id', None)
+    session.pop('username', None)
     return redirect(url_for('login'))
 
 @app.route('/')
@@ -105,7 +133,8 @@ def paste():
             'user_agent': request.headers.get('User-Agent', '')
         }
         
-        save_clipboard_entry(content_type, content, str(metadata), client_id)
+        user_id = session.get('user_id')
+        save_clipboard_entry(user_id, content_type, content, str(metadata), client_id)
         
         return jsonify({
             'status': 'success',
@@ -121,7 +150,8 @@ def paste():
 def get_clipboard():
     """Get current clipboard content"""
     try:
-        entry = get_clipboard_entry()
+        user_id = session.get('user_id')
+        entry = get_clipboard_entry(user_id)
         if entry:
             return jsonify({
                 'status': 'success',
@@ -164,10 +194,12 @@ def poll_clipboard():
                 return True  # Send if no filtering needed
             return entry.get('client_id') != client_id  # Don't send if same client
         
+        user_id = session.get('user_id')
+        
         # Check if there's already a change
-        current_version = get_clipboard_version()
+        current_version = get_clipboard_version(user_id)
         if current_version > last_version:
-            entry = get_clipboard_entry()
+            entry = get_clipboard_entry(user_id)
             if should_send_to_client(entry):
                 return jsonify({
                     'status': 'success',
@@ -176,10 +208,10 @@ def poll_clipboard():
                 })
         
         # Wait for change
-        entry = wait_for_clipboard_change(last_version, timeout)
+        entry = wait_for_clipboard_change(user_id, last_version, timeout)
         
         # Always get the latest version for consistent responses
-        final_version = get_clipboard_version()
+        final_version = get_clipboard_version(user_id)
         
         if entry and should_send_to_client(entry):
             return jsonify({

@@ -68,7 +68,8 @@ class TestSimple(unittest.TestCase):
     def test_authenticated_main_page(self):
         """Test main page when authenticated"""
         with self.app.session_transaction() as sess:
-            sess['authenticated'] = True
+            sess['user_id'] = 1
+            sess['username'] = 'user'
         
         response = self.app.get('/')
         self.assertEqual(response.status_code, 200)
@@ -78,7 +79,8 @@ class TestSimple(unittest.TestCase):
     def test_authenticated_api_endpoint(self):
         """Test API endpoint when authenticated"""
         with self.app.session_transaction() as sess:
-            sess['authenticated'] = True
+            sess['user_id'] = 1
+            sess['username'] = 'user'
         
         response = self.app.get('/api/clipboard')
         self.assertEqual(response.status_code, 200)
@@ -92,7 +94,8 @@ class TestSimple(unittest.TestCase):
         """Test logout functionality"""
         # First authenticate
         with self.app.session_transaction() as sess:
-            sess['authenticated'] = True
+            sess['user_id'] = 1
+            sess['username'] = 'user'
         
         # Then logout
         response = self.app.get('/logout')
