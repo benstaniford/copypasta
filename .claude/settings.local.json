@@ -24,7 +24,8 @@
       "Bash(mkdir:*)",
       "Bash(chmod:*)",
       "Bash(grep:*)",
-      "Bash(xcodebuild:*)"
+      "Bash(xcodebuild:*)",
+      "Bash(find:*)"
     ],
     "deny": [],
     "ask": []

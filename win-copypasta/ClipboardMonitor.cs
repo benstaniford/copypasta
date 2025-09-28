@@ -42,6 +42,8 @@ namespace CopyPasta
 
         private ClipboardForm _clipboardForm = null!;
         private string _lastClipboardContent = "";
+        private bool _suppressNextChange = false;
+        private DateTime _lastSetTime = DateTime.MinValue;
 
         public event EventHandler<ClipboardChangedEventArgs>? ClipboardChanged;
 
@@ -77,6 +79,20 @@ namespace CopyPasta
         private void OnClipboardUpdate()
         {
             Logger.Log("ClipboardMonitor", "Clipboard update detected");
+            
+            // Check if we should suppress this change (recently set by SetClipboardContent)
+            if (_suppressNextChange && (DateTime.Now - _lastSetTime).TotalMilliseconds < 2000)
+            {
+                Logger.Log("ClipboardMonitor", "Suppressing clipboard change - recently set by SetClipboardContent");
+                _suppressNextChange = false;
+                return;
+            }
+            
+            // Reset suppression flag after timeout
+            if ((DateTime.Now - _lastSetTime).TotalMilliseconds >= 2000)
+            {
+                _suppressNextChange = false;
+            }
             
             // Small delay to ensure clipboard is ready
             System.Threading.Thread.Sleep(50);
@@ -192,7 +208,9 @@ namespace CopyPasta
                 Logger.Log("ClipboardMonitor", $"Setting clipboard content: type={contentType}, length={content?.Length ?? 0}");
                 Logger.Log("ClipboardMonitor", $"Content preview: '{(content?.Length > 50 ? content.Substring(0, 50) + "..." : content)}'");
                 
-                // Temporarily disable monitoring to avoid triggering our own event
+                // Set suppression flag to ignore the next few clipboard changes
+                _suppressNextChange = true;
+                _lastSetTime = DateTime.Now;
                 _lastClipboardContent = content ?? string.Empty;
 
                 // Ensure clipboard operations happen on the UI thread
