@@ -421,6 +421,56 @@
             background: #388e3c;
             transform: translateY(-1px);
         }
+        
+        /* Footer styles */
+        .app-footer {
+            margin-top: 3rem;
+            padding: 1.5rem 0 1rem 0;
+            border-top: 1px solid #404040;
+            text-align: center;
+            font-size: 0.8rem;
+            color: #888;
+        }
+        
+        .version-info {
+            margin-bottom: 0.75rem;
+        }
+        
+        .download-links {
+            display: flex;
+            justify-content: center;
+            gap: 1rem;
+            flex-wrap: wrap;
+        }
+        
+        .download-link {
+            color: #888;
+            text-decoration: none;
+            padding: 4px 8px;
+            border-radius: 3px;
+            transition: all 0.2s ease;
+            font-size: 0.75rem;
+        }
+        
+        .download-link:hover {
+            color: #4a9eff;
+            background: rgba(74, 158, 255, 0.1);
+        }
+        
+        .download-link::before {
+            margin-right: 4px;
+        }
+        
+        .download-link.windows::before { content: "🪟"; }
+        .download-link.mac::before { content: "🍎"; }
+        .download-link.linux::before { content: "🐧"; }
+        
+        @media (max-width: 480px) {
+            .download-links {
+                flex-direction: column;
+                gap: 0.5rem;
+            }
+        }
     </style>
 </head>
 <body>
@@ -478,6 +528,27 @@
                     <div id="historyList" class="history-list">
                         <div class="history-loading">Loading history...</div>
                     </div>
+                </div>
+            </div>
+            
+            <!-- Version and Download Footer -->
+            <div class="app-footer">
+                <div class="version-info">
+                    CopyPasta {{ version }}
+                </div>
+                <div class="download-links">
+                    <a href="https://github.com/benstaniford/copypasta/releases/download/v{{ version }}/CopyPastaInstaller-v{{ version }}.msi" 
+                       class="download-link windows" 
+                       target="_blank" 
+                       title="Download Windows installer">Windows</a>
+                    <a href="https://github.com/benstaniford/copypasta/releases/download/v{{ version }}/CopyPasta-{{ version }}-intel.dmg" 
+                       class="download-link mac" 
+                       target="_blank" 
+                       title="Download macOS application">macOS</a>
+                    <a href="https://github.com/benstaniford/copypasta/releases/download/v{{ version }}/copyp_{{ version }}-1_all.deb" 
+                       class="download-link linux" 
+                       target="_blank" 
+                       title="Download Linux CLI package">Linux</a>
                 </div>
             </div>
         </div>

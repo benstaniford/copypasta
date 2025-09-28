@@ -108,7 +108,9 @@ def logout():
 @login_required
 def index():
     """Main page"""
-    return render_template('index.html')
+    return render_template('index.html', 
+                         version=numeric_version,
+                         full_version=app_version)
 
 @app.route('/api/paste', methods=['POST'])
 @login_required
