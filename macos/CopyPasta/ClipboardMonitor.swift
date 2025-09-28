@@ -79,30 +79,67 @@ class ClipboardMonitor {
     }
     
     private func getClipboardContent() -> (content: String, type: ClipboardContentType)? {
+        // Debug: Print all available types on pasteboard
+        let availableTypes = pasteboard.types ?? []
+        print("=== CLIPBOARD DEBUG ===")
+        print("Available pasteboard types: \(availableTypes)")
+        
         // Check for images first
         if let imageData = pasteboard.data(forType: .tiff),
            let image = NSImage(data: imageData),
            let pngData = image.pngData {
             let base64String = pngData.base64EncodedString()
+            print("DETECTED: Image content")
             return (content: "data:image/png;base64,\(base64String)", type: .image)
         }
         
+        // Get plain text for comparison
+        let plainText = pasteboard.string(forType: .string) ?? ""
+        print("Plain text content: '\(plainText)'")
+        print("Plain text length: \(plainText.count)")
+        
         // Check for rich text (RTF)
-        if let rtfData = pasteboard.data(forType: .rtf),
-           let attributedString = NSAttributedString(rtf: rtfData, documentAttributes: nil) {
-            // Convert to HTML for rich text
-            if let htmlData = try? attributedString.data(from: NSRange(location: 0, length: attributedString.length),
-                                                        documentAttributes: [.documentType: NSAttributedString.DocumentType.html]) {
-                let htmlString = String(data: htmlData, encoding: .utf8) ?? attributedString.string
-                return (content: htmlString, type: .richText)
+        if let rtfData = pasteboard.data(forType: .rtf) {
+            print("RTF data found, size: \(rtfData.count) bytes")
+            
+            if let attributedString = NSAttributedString(rtf: rtfData, documentAttributes: nil) {
+                print("RTF parsed successfully")
+                print("RTF plain text: '\(attributedString.string)'")
+                print("RTF plain text length: \(attributedString.string.count)")
+                
+                // Debug: Print all attributes in the RTF
+                let fullRange = NSRange(location: 0, length: attributedString.length)
+                print("RTF Attributes:")
+                attributedString.enumerateAttributes(in: fullRange, options: []) { attributes, range, stop in
+                    print("  Range \(range): \(attributes)")
+                }
+                
+                // Convert to HTML for rich text
+                if let htmlData = try? attributedString.data(from: NSRange(location: 0, length: attributedString.length),
+                                                            documentAttributes: [.documentType: NSAttributedString.DocumentType.html]) {
+                    let htmlString = String(data: htmlData, encoding: .utf8) ?? attributedString.string
+                    print("HTML conversion successful")
+                    print("HTML content: '\(htmlString)'")
+                    print("HTML length: \(htmlString.count)")
+                    print("DETECTED: Rich text content")
+                    return (content: htmlString, type: .richText)
+                } else {
+                    print("HTML conversion failed")
+                }
+            } else {
+                print("RTF parsing failed")
             }
+        } else {
+            print("No RTF data found")
         }
         
         // Check for plain text
-        if let string = pasteboard.string(forType: .string), !string.isEmpty {
-            return (content: string, type: .text)
+        if !plainText.isEmpty {
+            print("DETECTED: Plain text content")
+            return (content: plainText, type: .text)
         }
         
+        print("No supported content found")
         return nil
     }
     
