@@ -101,32 +101,19 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             copyPastaClient.startPolling()
         }
         
-        Logger.log("AppDelegate", "Checking accessibility permissions...")
-        // Check accessibility permissions and start clipboard monitoring accordingly
+        Logger.log("AppDelegate", "Starting clipboard monitoring...")
+        // Start clipboard monitoring - it works regardless of accessibility permission status
+        clipboardMonitor.startMonitoring()
+        
+        // Check accessibility permissions for informational purposes
         let hasPermissions = AccessibilityPermissionManager.shared.hasAccessibilityPermissions()
         Logger.log("AppDelegate", "Accessibility permissions status: \(hasPermissions)")
         
-        if hasPermissions {
-            Logger.log("AppDelegate", "Accessibility permissions already granted, starting clipboard monitoring...")
-            clipboardMonitor.startMonitoring()
-            Logger.log("AppDelegate", "All services started")
-        } else {
-            Logger.log("AppDelegate", "Accessibility permissions not granted, setting up permission monitoring...")
-            
-            // Since you've confirmed permissions are granted in System Settings, let's try starting anyway
-            Logger.log("AppDelegate", "Attempting to start clipboard monitoring despite permission check...")
-            clipboardMonitor.startMonitoring()
-            
-            // Start periodic check for when permissions are granted
-            AccessibilityPermissionManager.shared.startPeriodicCheck { [weak self] in
-                Logger.log("AppDelegate", "Accessibility permissions granted, starting clipboard monitoring...")
-                self?.clipboardMonitor.startMonitoring()
-                Logger.log("AppDelegate", "All services started")
-            }
-            
-            // Request permissions (will show dialog if needed)
-            AccessibilityPermissionManager.shared.requestAccessibilityPermissions()
+        if !hasPermissions {
+            Logger.log("AppDelegate", "Note: Accessibility permissions not detected, but clipboard monitoring works anyway")
         }
+        
+        Logger.log("AppDelegate", "All services started")
     }
     
     private func cleanup() {

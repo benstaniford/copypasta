@@ -46,12 +46,6 @@ class ClipboardMonitor {
                 }
                 Logger.log("ClipboardMonitor", "Timer started successfully, polling every 0.5 seconds")
                 
-                // Log status every 30 seconds to verify monitoring is active
-                Timer.scheduledTimer(withTimeInterval: 30.0, repeats: true) { [weak self] _ in
-                    if let self = self {
-                        Logger.log("ClipboardMonitor", "Status: Active, current changeCount: \(self.pasteboard.changeCount)")
-                    }
-                }
             } catch {
                 Logger.logError("ClipboardMonitor", "Failed to access clipboard", error)
             }
