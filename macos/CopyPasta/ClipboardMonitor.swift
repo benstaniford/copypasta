@@ -114,6 +114,12 @@ class ClipboardMonitor {
                     print("  Range \(range): \(attributes)")
                 }
                 
+                // Check if this is terminal styling vs actual rich content
+                if isTerminalStyling(attributedString: attributedString, plainText: plainText) {
+                    print("DETECTED: Terminal styling - treating as plain text")
+                    return (content: plainText, type: .text)
+                }
+                
                 // Convert to HTML for rich text
                 if let htmlData = try? attributedString.data(from: NSRange(location: 0, length: attributedString.length),
                                                             documentAttributes: [.documentType: NSAttributedString.DocumentType.html]) {
@@ -141,6 +147,94 @@ class ClipboardMonitor {
         
         print("No supported content found")
         return nil
+    }
+    
+    private func isTerminalStyling(attributedString: NSAttributedString, plainText: String) -> Bool {
+        // Check if RTF text matches plain text
+        let rtfText = attributedString.string
+        if rtfText != plainText {
+            print("Terminal check: RTF text differs from plain text")
+            return false
+        }
+        
+        let fullRange = NSRange(location: 0, length: attributedString.length)
+        var attributeRanges: [(NSRange, [NSAttributedString.Key: Any])] = []
+        var hasRichFormatting = false
+        
+        // Collect all attribute ranges
+        attributedString.enumerateAttributes(in: fullRange, options: []) { attributes, range, stop in
+            attributeRanges.append((range, attributes))
+            
+            // Check for rich formatting attributes that indicate actual rich content
+            for (key, value) in attributes {
+                switch key {
+                case .underlineStyle, .strikethroughStyle:
+                    if let styleValue = value as? Int, styleValue != 0 {
+                        print("Terminal check: Text decoration detected - rich content")
+                        hasRichFormatting = true
+                        stop.pointee = true
+                    }
+                case .link, .attachment:
+                    print("Terminal check: Links/attachments detected - rich content")
+                    hasRichFormatting = true
+                    stop.pointee = true
+                default:
+                    if key.rawValue.contains("Shadow") || key.rawValue.contains("Stroke") || key.rawValue.contains("Outline") {
+                        print("Terminal check: Advanced text effects detected - rich content")
+                        hasRichFormatting = true
+                        stop.pointee = true
+                    }
+                }
+            }
+        }
+        
+        if hasRichFormatting {
+            return false
+        }
+        
+        print("Terminal check: Found \(attributeRanges.count) attribute ranges")
+        
+        // Check if we have a single formatting block (terminal-like) or uniform formatting
+        if attributeRanges.count == 1 {
+            let (range, attributes) = attributeRanges[0]
+            print("Terminal check: Single attribute range covering \(range)")
+            
+            // Check if it uses a monospace font
+            if let font = attributes[.font] as? NSFont {
+                let isMonospace = font.isFixedPitch
+                print("Terminal check: Font '\(font.fontName)' isMonospace=\(isMonospace)")
+                
+                if isMonospace {
+                    print("Terminal check: Single monospace block detected - treating as terminal")
+                    return true
+                }
+            }
+        } else {
+            // Multiple ranges - check if they all use the same monospace font (like colored terminal output)
+            var fonts: Set<String> = []
+            var allMonospace = true
+            
+            for (range, attributes) in attributeRanges {
+                if let font = attributes[.font] as? NSFont {
+                    fonts.insert(font.fontName)
+                    if !font.isFixedPitch {
+                        allMonospace = false
+                        break
+                    }
+                }
+            }
+            
+            print("Terminal check: \(attributeRanges.count) ranges with fonts: \(fonts), allMonospace=\(allMonospace)")
+            
+            // If all ranges use the same monospace font, it's likely terminal output with colors
+            if fonts.count == 1 && allMonospace {
+                print("Terminal check: Multiple ranges with same monospace font - treating as terminal")
+                return true
+            }
+        }
+        
+        print("Terminal check: Not terminal styling - treating as rich content")
+        return false
     }
     
     func setClipboardContent(content: String, type: ClipboardContentType) {
