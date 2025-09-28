@@ -23,7 +23,8 @@
       "Read(//home/ben/Code/remote-control/**)",
       "Bash(mkdir:*)",
       "Bash(chmod:*)",
-      "Bash(grep:*)"
+      "Bash(grep:*)",
+      "Bash(xcodebuild:*)"
     ],
     "deny": [],
     "ask": []

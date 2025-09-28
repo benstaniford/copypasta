@@ -23,17 +23,23 @@ class ClipboardMonitor {
     func startMonitoring() {
         Logger.log("ClipboardMonitor", "Starting clipboard monitoring")
         
-        // Get initial change count on main thread
-        DispatchQueue.main.async { [weak self] in
+        // Start monitoring with a slight delay to avoid blocking app launch
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
             guard let self = self else { return }
-            self.lastChangeCount = self.pasteboard.changeCount
-            Logger.log("ClipboardMonitor", "Initial change count: \(self.lastChangeCount)")
             
-            // Start timer on main thread
-            self.timer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
-                self?.checkForChanges()
+            do {
+                // Try to access pasteboard safely
+                self.lastChangeCount = self.pasteboard.changeCount
+                Logger.log("ClipboardMonitor", "Initial change count: \(self.lastChangeCount)")
+                
+                // Start timer on main thread
+                self.timer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
+                    self?.checkForChanges()
+                }
+                Logger.log("ClipboardMonitor", "Timer started successfully")
+            } catch {
+                Logger.logError("ClipboardMonitor", "Failed to access clipboard", error)
             }
-            Logger.log("ClipboardMonitor", "Timer started successfully")
         }
     }
     

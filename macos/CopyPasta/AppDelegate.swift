@@ -3,6 +3,12 @@ import Cocoa
 @main
 class AppDelegate: NSObject, NSApplicationDelegate {
     
+    override init() {
+        super.init()
+        print("CopyPasta: AppDelegate init called")
+        Logger.log("AppDelegate", "AppDelegate initialized")
+    }
+    
     private var statusBarController: StatusBarController!
     private var clipboardMonitor: ClipboardMonitor!
     private var copyPastaClient: CopyPastaClient!
@@ -64,11 +70,16 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             copyPastaClient.startPolling()
         }
         
-        Logger.log("AppDelegate", "Starting clipboard monitoring...")
-        // Start clipboard monitoring
-        clipboardMonitor.startMonitoring()
+        Logger.log("AppDelegate", "Checking accessibility permissions...")
+        // Check accessibility permissions before starting clipboard monitoring
+        AccessibilityPermissionManager.shared.startPeriodicCheck { [weak self] in
+            Logger.log("AppDelegate", "Accessibility permissions granted, starting clipboard monitoring...")
+            self?.clipboardMonitor.startMonitoring()
+            Logger.log("AppDelegate", "All services started")
+        }
         
-        Logger.log("AppDelegate", "All services started")
+        // Request permissions if not already granted
+        AccessibilityPermissionManager.shared.requestAccessibilityPermissions()
     }
     
     private func cleanup() {

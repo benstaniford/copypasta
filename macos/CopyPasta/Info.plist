@@ -32,5 +32,7 @@
 	<string>NSApplication</string>
 	<key>NSSupportsAutomaticTermination</key>
 	<false/>
+	<key>NSAppleEventsUsageDescription</key>
+	<string>CopyPasta needs access to communicate with other applications for clipboard sharing.</string>
 </dict>
 </plist>
