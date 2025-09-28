@@ -58,18 +58,40 @@ class CopyPastaClient {
     }
     
     func testConnection() async -> Bool {
-        guard let settings = settings else { return false }
+        guard let settings = settings else { 
+            Logger.log("CopyPastaClient", "testConnection failed: no settings")
+            return false 
+        }
         
-        let url = URL(string: "\(settings.serverEndpoint)/health")!
+        guard let url = URL(string: "\(settings.serverEndpoint)/health") else {
+            Logger.log("CopyPastaClient", "testConnection failed: invalid URL \(settings.serverEndpoint)/health")
+            return false
+        }
+        
         Logger.logNetwork("GET", url.absoluteString, "Starting")
         
         do {
-            let (_, response) = try await urlSession.data(from: url)
-            let success = (response as? HTTPURLResponse)?.statusCode == 200
-            Logger.logNetwork("GET", url.absoluteString, success ? "Success" : "Failed")
-            return success
+            let (data, response) = try await urlSession.data(from: url)
+            
+            if let httpResponse = response as? HTTPURLResponse {
+                Logger.logNetwork("GET", url.absoluteString, "Response", "Status: \(httpResponse.statusCode)")
+                
+                if httpResponse.statusCode == 200 {
+                    if let responseString = String(data: data, encoding: .utf8) {
+                        Logger.logNetwork("GET", url.absoluteString, "Success", "Response: \(responseString)")
+                    }
+                    return true
+                } else {
+                    Logger.logNetwork("GET", url.absoluteString, "Failed", "HTTP \(httpResponse.statusCode)")
+                    return false
+                }
+            } else {
+                Logger.logNetwork("GET", url.absoluteString, "Failed", "No HTTP response")
+                return false
+            }
         } catch {
             Logger.logNetwork("GET", url.absoluteString, "Exception", error.localizedDescription)
+            Logger.log("CopyPastaClient", "testConnection error details: \(error)")
             return false
         }
     }
