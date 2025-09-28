@@ -883,16 +883,40 @@
             }
         }
 
+        function showHistoryItemStatus(button, message, isError = false) {
+            // Store original button content
+            const originalText = button.textContent;
+            const originalBackground = button.style.backgroundColor;
+            
+            // Update button to show status
+            button.textContent = message;
+            button.style.backgroundColor = isError ? '#d32f2f' : '#2e7d32';
+            
+            // Reset after 2 seconds
+            setTimeout(() => {
+                button.textContent = originalText;
+                button.style.backgroundColor = originalBackground;
+            }, 2000);
+        }
+
         async function copyHistoryItem(index, event) {
             event.stopPropagation(); // Prevent toggling the item
             
             const historyItems = document.querySelectorAll('.history-item');
             const item = historyItems[index];
             const itemData = JSON.parse(item.dataset.itemData);
+            const button = event.target;
+            
+            // Debug: Log what we're trying to copy
+            console.log('Copying historical item:', {
+                content: itemData.content.substring(0, 50) + (itemData.content.length > 50 ? '...' : ''),
+                type: itemData.content_type,
+                created_at: itemData.created_at
+            });
             
             try {
                 if (itemData.content_type === 'image') {
-                    showStatus('copyStatus', 'Right-click the image and "Save Image" to copy it');
+                    showHistoryItemStatus(button, 'Right-click image to save', false);
                 } else if (itemData.content_type === 'rich') {
                     if (navigator.clipboard && navigator.clipboard.write) {
                         try {
@@ -908,13 +932,13 @@
                             ];
                             
                             await navigator.clipboard.write(clipboardItems);
-                            showStatus('copyStatus', 'Historical rich content copied to device clipboard!');
+                            showHistoryItemStatus(button, '✓ Rich text copied!', false);
                         } catch (richError) {
                             const tempDiv = document.createElement('div');
                             tempDiv.innerHTML = itemData.content;
                             const plainText = tempDiv.textContent || tempDiv.innerText || '';
                             await navigator.clipboard.writeText(plainText);
-                            showStatus('copyStatus', 'Historical text content copied to device clipboard!');
+                            showHistoryItemStatus(button, '✓ Text copied!', false);
                         }
                     } else {
                         const tempDiv = document.createElement('div');
@@ -927,12 +951,13 @@
                         textArea.select();
                         document.execCommand('copy');
                         document.body.removeChild(textArea);
-                        showStatus('copyStatus', 'Historical text content copied to device clipboard!');
+                        showHistoryItemStatus(button, '✓ Text copied!', false);
                     }
                 } else {
+                    // Plain text
                     if (navigator.clipboard && navigator.clipboard.writeText) {
                         await navigator.clipboard.writeText(itemData.content);
-                        showStatus('copyStatus', 'Historical text copied to device clipboard!');
+                        showHistoryItemStatus(button, '✓ Copied!', false);
                     } else {
                         const textArea = document.createElement('textarea');
                         textArea.value = itemData.content;
@@ -940,11 +965,12 @@
                         textArea.select();
                         document.execCommand('copy');
                         document.body.removeChild(textArea);
-                        showStatus('copyStatus', 'Historical text copied to device clipboard!');
+                        showHistoryItemStatus(button, '✓ Copied!', false);
                     }
                 }
             } catch (error) {
-                showStatus('copyStatus', 'Failed to copy historical item: ' + error.message, true);
+                console.error('Copy error:', error);
+                showHistoryItemStatus(button, 'Copy failed', true);
             }
         }
     </script>
