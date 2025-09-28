@@ -73,6 +73,16 @@
             background: #357abd;
             transform: translateY(-1px);
         }
+        button:disabled {
+            background: #666;
+            cursor: not-allowed;
+            transform: none;
+            opacity: 0.7;
+        }
+        button:disabled:hover {
+            background: #666;
+            transform: none;
+        }
         #api-result {
             margin-top: 1rem;
             padding: 1rem;
@@ -443,7 +453,7 @@
                             <label for="imageInput" class="file-input-label">📷 Upload Image</label>
                             <input type="file" id="imageInput" class="file-input" accept="image/*">
                         </div>
-                        <button onclick="pasteContent()">💾 Store</button>
+                        <button id="storeButton" onclick="pasteContent()">💾 Store</button>
                     </div>
                     
                     <div id="pasteStatus" class="status-message"></div>
@@ -583,7 +593,14 @@
         }
 
         async function pasteContent(type = null, content = null) {
+            const storeButton = document.getElementById('storeButton');
+            const originalButtonText = storeButton.innerHTML;
+            
             try {
+                // Disable button and show loading state
+                storeButton.disabled = true;
+                storeButton.innerHTML = '⏳ Storing...';
+                
                 let contentType = type || detectContentType();
                 let contentData = content;
                 
@@ -591,6 +608,9 @@
                     const pasteArea = document.getElementById('pasteArea');
                     if (pasteArea.innerHTML.trim() === '' || pasteArea.innerHTML === '<br>') {
                         showStatus('pasteStatus', 'Please enter some content to paste', true);
+                        // Reset button on validation error
+                        storeButton.innerHTML = originalButtonText;
+                        storeButton.disabled = false;
                         return;
                     }
                     
@@ -598,11 +618,9 @@
                     if (pasteArea.querySelector('img') || pasteArea.innerHTML !== pasteArea.textContent) {
                         contentType = 'rich';
                         contentData = pasteArea.innerHTML;
-                        showStatus('pasteStatus', `Saving as rich text...`, false);
                     } else {
                         contentType = 'text';
                         contentData = pasteArea.textContent;
-                        showStatus('pasteStatus', `Saving as plain text...`, false);
                     }
                 }
 
@@ -620,18 +638,33 @@
                 const result = await response.json();
                 
                 if (response.ok) {
+                    // Show success state briefly
+                    storeButton.innerHTML = '✓ Stored!';
                     showStatus('pasteStatus', `${contentType === 'rich' ? 'Rich content' : contentType === 'image' ? 'Image' : 'Text'} saved to clipboard!`);
+                    
                     if (contentType === 'text' || contentType === 'rich') {
                         document.getElementById('pasteArea').innerHTML = '';
                     } else {
                         document.getElementById('imageInput').value = '';
                     }
                     await refreshClipboard();
+                    
+                    // Reset button after 1 second
+                    setTimeout(() => {
+                        storeButton.innerHTML = originalButtonText;
+                        storeButton.disabled = false;
+                    }, 1000);
                 } else {
                     showStatus('pasteStatus', result.error || 'Failed to save content', true);
+                    // Reset button immediately on error
+                    storeButton.innerHTML = originalButtonText;
+                    storeButton.disabled = false;
                 }
             } catch (error) {
                 showStatus('pasteStatus', 'Error: ' + error.message, true);
+                // Reset button immediately on error
+                storeButton.innerHTML = originalButtonText;
+                storeButton.disabled = false;
             }
         }
 
