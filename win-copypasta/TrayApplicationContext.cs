@@ -75,6 +75,9 @@ namespace CopyPasta
                 Font = new Font(contextMenu.Font, FontStyle.Bold)
             };
             
+            var onlineClipsItem = new ToolStripMenuItem("Online Clips...");
+            onlineClipsItem.Click += OnlineClipsItem_Click;
+            
             var settingsItem = new ToolStripMenuItem("Settings...");
             settingsItem.Click += SettingsItem_Click;
             
@@ -92,6 +95,8 @@ namespace CopyPasta
             contextMenu.Items.AddRange(new ToolStripItem[]
             {
                 statusItem,
+                new ToolStripSeparator(),
+                onlineClipsItem,
                 new ToolStripSeparator(),
                 settingsItem,
                 viewLogsItem,
@@ -167,6 +172,12 @@ namespace CopyPasta
             ShowSettings();
         }
 
+        private void OnlineClipsItem_Click(object? sender, EventArgs e)
+        {
+            Logger.Log("TrayApp", "Online Clips menu clicked");
+            OpenOnlineClips();
+        }
+
         private void SettingsItem_Click(object? sender, EventArgs e)
         {
             Logger.Log("TrayApp", "Settings menu clicked");
@@ -218,6 +229,35 @@ namespace CopyPasta
                         _client.StartPolling();
                     }
                 }
+            }
+        }
+
+        private void OpenOnlineClips()
+        {
+            try
+            {
+                if (_settings.IsConfigured)
+                {
+                    var url = _settings.ServerEndpoint;
+                    Logger.Log("TrayApp", $"Opening web interface at: {url}");
+                    System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+                    {
+                        FileName = url,
+                        UseShellExecute = true
+                    });
+                }
+                else
+                {
+                    MessageBox.Show("Please configure the server settings first.", "CopyPasta", 
+                        MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    ShowSettings();
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError("TrayApp", "Failed to open web interface", ex);
+                MessageBox.Show($"Failed to open web interface: {ex.Message}", "CopyPasta", 
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
 

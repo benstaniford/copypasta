@@ -2,6 +2,7 @@ import Cocoa
 import UserNotifications
 
 protocol StatusBarControllerDelegate: AnyObject {
+    func statusBarControllerDidRequestOnlineClips()
     func statusBarControllerDidRequestSettings()
     func statusBarControllerDidRequestAbout()
     func statusBarControllerDidRequestQuit()
@@ -86,6 +87,14 @@ class StatusBarController: NSObject {
         
         menu.addItem(NSMenuItem.separator())
         
+        // Online Clips
+        let onlineClipsItem = NSMenuItem(title: "Online Clips...", action: #selector(onlineClipsClicked), keyEquivalent: "")
+        onlineClipsItem.target = self
+        onlineClipsItem.isEnabled = true
+        menu.addItem(onlineClipsItem)
+        
+        menu.addItem(NSMenuItem.separator())
+        
         // Settings
         let settingsItem = NSMenuItem(title: "Settings...", action: #selector(settingsClicked), keyEquivalent: ",")
         settingsItem.target = self
@@ -117,6 +126,10 @@ class StatusBarController: NSObject {
                 Logger.log("StatusBarController", "Notification permission granted: \(granted)")
             }
         }
+    }
+    
+    @objc private func onlineClipsClicked() {
+        delegate?.statusBarControllerDidRequestOnlineClips()
     }
     
     @objc private func settingsClicked() {

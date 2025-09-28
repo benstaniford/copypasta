@@ -124,6 +124,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
 // MARK: - StatusBarController Delegate
 extension AppDelegate: StatusBarControllerDelegate {
+    func statusBarControllerDidRequestOnlineClips() {
+        Logger.log("AppDelegate", "Online Clips requested")
+        openOnlineClips()
+    }
+    
     func statusBarControllerDidRequestSettings() {
         Logger.log("AppDelegate", "Settings requested")
         showSettings()
@@ -148,6 +153,42 @@ extension AppDelegate: StatusBarControllerDelegate {
         settingsController?.showWindow(nil)
         settingsController?.window?.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
+    }
+    
+    private func openOnlineClips() {
+        let settings = Settings.shared
+        
+        if settings.isConfigured {
+            let url = URL(string: settings.serverEndpoint)
+            if let url = url {
+                Logger.log("AppDelegate", "Opening web interface at: \(settings.serverEndpoint)")
+                NSWorkspace.shared.open(url)
+            } else {
+                Logger.log("AppDelegate", "Invalid server endpoint URL: \(settings.serverEndpoint)")
+                showAlert(title: "Invalid URL", message: "The server endpoint URL is not valid. Please check your settings.")
+            }
+        } else {
+            Logger.log("AppDelegate", "Settings not configured, showing settings first")
+            showAlert(title: "Configuration Required", message: "Please configure the server settings first.", showSettings: true)
+        }
+    }
+    
+    private func showAlert(title: String, message: String, showSettings: Bool = false) {
+        let alert = NSAlert()
+        alert.messageText = title
+        alert.informativeText = message
+        alert.alertStyle = .informational
+        alert.addButton(withTitle: "OK")
+        
+        if showSettings {
+            alert.addButton(withTitle: "Settings...")
+        }
+        
+        let response = alert.runModal()
+        
+        if showSettings && response == .alertSecondButtonReturn {
+            self.showSettings()
+        }
     }
     
     private func showAbout() {
