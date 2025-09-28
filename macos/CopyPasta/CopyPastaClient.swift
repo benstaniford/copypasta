@@ -112,6 +112,8 @@ class CopyPastaClient {
             "client_id": clientId
         ]
         
+        Logger.log("CopyPastaClient", "Uploading with client_id: \(clientId)")
+        
         let jsonData = try JSONSerialization.data(withJSONObject: payload)
         
         let url = URL(string: "\(settings.serverEndpoint)/api/paste")!
@@ -194,7 +196,9 @@ class CopyPastaClient {
             do {
                 try await ensureAuthenticated()
                 
-                let url = URL(string: "\(settings.serverEndpoint)/api/poll?version=\(lastKnownVersion)&timeout=30&client_id=\(clientId.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? clientId)")!
+                let encodedClientId = clientId.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? clientId
+                let url = URL(string: "\(settings.serverEndpoint)/api/poll?version=\(lastKnownVersion)&timeout=30&client_id=\(encodedClientId)")!
+                Logger.log("CopyPastaClient", "Polling with client_id: \(clientId) (encoded: \(encodedClientId))")
                 var request = URLRequest(url: url)
                 
                 if let sessionCookie = sessionCookie {
@@ -210,21 +214,29 @@ class CopyPastaClient {
                         }
                         
                         if pollResponse.status == "success", let clipboardData = pollResponse.data {
-                            Logger.logNetwork("LongPoll", url.absoluteString, "NewData", "Version: \(pollResponse.version), Type: \(clipboardData.contentType)")
+                            let dataClientId = clipboardData.clientId ?? "unknown"
+                            Logger.logNetwork("LongPoll", url.absoluteString, "NewData", "Version: \(pollResponse.version), Type: \(clipboardData.contentType), ClientID: \(dataClientId)")
                             
-                            let contentType: ClipboardContentType
-                            switch clipboardData.contentType {
-                            case "text":
-                                contentType = .text
-                            case "rich":
-                                contentType = .richText
-                            case "image":
-                                contentType = .image
-                            default:
-                                contentType = .text
+                            // Double-check client ID filtering on client side as backup
+                            if let clipboardClientId = clipboardData.clientId, clipboardClientId == clientId {
+                                Logger.log("CopyPastaClient", "Ignoring clipboard change from same client: \(clipboardClientId)")
+                            } else {
+                                Logger.log("CopyPastaClient", "Processing clipboard change from different client: \(dataClientId) (our ID: \(clientId))")
+                                
+                                let contentType: ClipboardContentType
+                                switch clipboardData.contentType {
+                                case "text":
+                                    contentType = .text
+                                case "rich":
+                                    contentType = .richText
+                                case "image":
+                                    contentType = .image
+                                default:
+                                    contentType = .text
+                                }
+                                
+                                delegate?.clipboardChangedOnServer(content: clipboardData.content, type: contentType)
                             }
-                            
-                            delegate?.clipboardChangedOnServer(content: clipboardData.content, type: contentType)
                         } else if pollResponse.status == "timeout" {
                             Logger.logNetwork("LongPoll", url.absoluteString, "Timeout", "Version: \(pollResponse.version)")
                         }
@@ -263,6 +275,7 @@ struct ClipboardData: Codable {
     let metadata: String
     let createdAt: String
     let version: Int
+    let clientId: String?
     
     enum CodingKeys: String, CodingKey {
         case contentType = "content_type"
@@ -270,6 +283,7 @@ struct ClipboardData: Codable {
         case metadata
         case createdAt = "created_at"
         case version
+        case clientId = "client_id"
     }
 }
 
