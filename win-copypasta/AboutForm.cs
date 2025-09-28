@@ -26,7 +26,7 @@ namespace CopyPasta
         {
             Text = "About CopyPasta";
             Size = new Size(350, 250);
-            StartPosition = FormStartPosition.CenterParent;
+            StartPosition = FormStartPosition.CenterScreen;
             FormBorderStyle = FormBorderStyle.FixedDialog;
             MaximizeBox = false;
             MinimizeBox = false;
