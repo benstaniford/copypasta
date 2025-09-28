@@ -36,7 +36,14 @@ class ClipboardMonitor {
                 self.timer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
                     self?.checkForChanges()
                 }
-                Logger.log("ClipboardMonitor", "Timer started successfully")
+                Logger.log("ClipboardMonitor", "Timer started successfully, polling every 0.5 seconds")
+                
+                // Log status every 30 seconds to verify monitoring is active
+                Timer.scheduledTimer(withTimeInterval: 30.0, repeats: true) { [weak self] _ in
+                    if let self = self {
+                        Logger.log("ClipboardMonitor", "Status: Active, current changeCount: \(self.pasteboard.changeCount)")
+                    }
+                }
             } catch {
                 Logger.logError("ClipboardMonitor", "Failed to access clipboard", error)
             }
@@ -53,6 +60,7 @@ class ClipboardMonitor {
         let currentChangeCount = pasteboard.changeCount
         
         if currentChangeCount != lastChangeCount && !isUpdatingFromServer {
+            Logger.log("ClipboardMonitor", "Clipboard change detected: \(lastChangeCount) -> \(currentChangeCount)")
             lastChangeCount = currentChangeCount
             handleClipboardChange()
         }
