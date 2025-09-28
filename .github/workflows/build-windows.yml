@@ -1,0 +1,169 @@
+name: Build Windows Client
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to build (e.g., v1.0.0)'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    env:
+      DOTNET_NOLOGO: true
+      DOTNET_CLI_TELEMETRY_OPTOUT: true
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Extract version
+        id: version
+        run: |
+          $version = "${{ github.event.inputs.version }}"
+          echo "VERSION=$version" >> $env:GITHUB_OUTPUT
+          $numericVersion = $version -replace '^v', ''
+          echo "NUMERIC_VERSION=$numericVersion" >> $env:GITHUB_OUTPUT
+          echo "Version: $numericVersion"
+
+      # C# Build and Test
+      - name: Setup .NET Framework
+        uses: microsoft/setup-msbuild@v2
+
+      - name: Setup NuGet
+        uses: nuget/setup-nuget@v1
+        with:
+          nuget-version: 'latest'
+
+      - name: Restore NuGet packages
+        run: nuget restore win-copypasta/CopyPasta.sln
+
+      - name: Build C# Project (Debug)
+        run: msbuild win-copypasta/CopyPasta.csproj /p:Configuration=Debug /p:Platform="Any CPU"
+
+      - name: Build C# Project (Release)
+        run: msbuild win-copypasta/CopyPasta.csproj /p:Configuration=Release /p:Platform="Any CPU"
+
+      - name: Update Assembly Version
+        run: |
+          $version = "${{ steps.version.outputs.NUMERIC_VERSION }}"
+          $csprojPath = "win-copypasta/CopyPasta.csproj"
+          
+          Write-Host "Updating CopyPasta.csproj with version: $version"
+          
+          # Read the current content
+          $content = Get-Content $csprojPath -Raw
+          
+          # Update version properties
+          $content = $content -replace '<AssemblyVersion>.*?</AssemblyVersion>', "<AssemblyVersion>$version.0</AssemblyVersion>"
+          $content = $content -replace '<FileVersion>.*?</FileVersion>', "<FileVersion>$version.0</FileVersion>"
+          
+          # Write back to file
+          Set-Content $csprojPath -Value $content -NoNewline
+          
+          Write-Host "✓ CopyPasta.csproj updated"
+          Write-Host "Updated version lines:"
+          Get-Content $csprojPath | Select-String "AssemblyVersion|FileVersion"
+
+      - name: Update WiX Product Version
+        run: |
+          $version = "${{ steps.version.outputs.NUMERIC_VERSION }}"
+          $wxsPath = "win-copypasta/CopyPasta.Installer/Product.wxs"
+          
+          Write-Host "Updating Product.wxs with version: $version"
+          
+          # Read the current content
+          $content = Get-Content $wxsPath -Raw
+          
+          # Update the Product Version attribute (WiX requires x.x.x.x format)
+          $content = $content -replace '(<Product[^>]*\s)Version="[\d\.]*"', "`$1Version=`"$version.0`""
+          
+          # Write back to file
+          Set-Content $wxsPath -Value $content -NoNewline
+          
+          Write-Host "✓ Product.wxs updated"
+          Write-Host "Updated version line:"
+          Get-Content $wxsPath | Select-String "Version="
+          
+      - name: Publish C# Project for WiX
+        run: dotnet publish win-copypasta/CopyPasta.csproj -c Release -r win-x86 --self-contained false -o win-copypasta/bin/Release/net6.0-windows/
+
+      # WiX Installer Build
+      - name: Setup WiX Toolset
+        run: |
+          Write-Host "Installing WiX Toolset..."
+          choco install wixtoolset -y --no-progress
+          Write-Host "Refreshing environment..."
+          refreshenv
+          # Add WiX to PATH for this session
+          $env:PATH += ";C:\Program Files (x86)\WiX Toolset v3.11\bin"
+          echo "PATH=$env:PATH" >> $env:GITHUB_ENV
+
+      - name: Remove BOM from WiX files
+        run: |
+          Write-Host "Checking and removing BOM from WiX files..."
+          $wxsPath = "win-copypasta/CopyPasta.Installer/Product.wxs"
+          $wixprojPath = "win-copypasta/CopyPasta.Installer/CopyPasta.Installer.wixproj"
+          
+          # Function to remove BOM from file
+          function Remove-BOM {
+              param($filePath)
+              if (Test-Path $filePath) {
+                  $content = Get-Content $filePath -Raw -Encoding UTF8
+                  # Remove BOM if present (EF BB BF)
+                  if ($content.StartsWith([char]0xFEFF)) {
+                      Write-Host "Removing BOM from: $filePath"
+                      $content = $content.Substring(1)
+                      [System.IO.File]::WriteAllText($filePath, $content, [System.Text.UTF8Encoding]::new($false))
+                  } else {
+                      Write-Host "No BOM found in: $filePath"
+                  }
+              }
+          }
+          
+          Remove-BOM $wxsPath
+          Remove-BOM $wixprojPath
+          Write-Host "✓ BOM check/removal completed"
+
+      - name: Build WiX Installer
+        run: |
+          $env:PATH += ";C:\Program Files (x86)\WiX Toolset v3.11\bin"
+          msbuild win-copypasta/CopyPasta.Installer/CopyPasta.Installer.wixproj /p:Configuration=Release /p:Platform=x86
+
+      - name: Verify MSI exists
+        run: |
+          $msiPath = "win-copypasta/CopyPasta.Installer/bin/Release/CopyPastaInstaller.msi"
+          if (Test-Path $msiPath) {
+            Write-Host "✓ MSI file found: $msiPath"
+            $size = (Get-Item $msiPath).Length
+            Write-Host "✓ MSI size: $([math]::Round($size / 1MB, 2)) MB"
+          } else {
+            Write-Host "✗ MSI file not found: $msiPath"
+            Get-ChildItem win-copypasta/CopyPasta.Installer/bin -Recurse
+            exit 1
+          }
+
+      - name: Rename MSI with version
+        run: |
+          $version = "${{ steps.version.outputs.NUMERIC_VERSION }}"
+          $originalPath = "win-copypasta/CopyPasta.Installer/bin/Release/CopyPastaInstaller.msi"
+          $newPath = "win-copypasta/CopyPasta.Installer/bin/Release/CopyPastaInstaller-v$version.msi"
+          
+          if (Test-Path $originalPath) {
+            Move-Item $originalPath $newPath
+            Write-Host "✓ MSI renamed to: CopyPastaInstaller-v$version.msi"
+          } else {
+            Write-Host "✗ Original MSI file not found"
+            exit 1
+          }
+
+      - name: Upload Windows artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: copypasta-windows-${{ steps.version.outputs.NUMERIC_VERSION }}
+          path: win-copypasta/CopyPasta.Installer/bin/Release/CopyPastaInstaller-v${{ steps.version.outputs.NUMERIC_VERSION }}.msi

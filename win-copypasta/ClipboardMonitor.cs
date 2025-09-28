@@ -4,6 +4,7 @@ using System.Drawing.Imaging;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Windows.Forms;
+using System.Web;
 
 namespace CopyPasta
 {
@@ -115,12 +116,27 @@ namespace CopyPasta
                         }
                     }
                 }
-                else if (Clipboard.ContainsData(DataFormats.Rtf))
+                else if (Clipboard.ContainsData(DataFormats.Html) || Clipboard.ContainsData(DataFormats.Rtf))
                 {
-                    // Handle rich text content
+                    // Handle rich text content - prioritize HTML format over RTF
                     Logger.Log("ClipboardMonitor", "Processing rich text content");
-                    var rtfContent = Clipboard.GetData(DataFormats.Rtf) as string;
-                    var htmlContent = ConvertRtfToHtml(rtfContent);
+                    string htmlContent = "";
+                    
+                    if (Clipboard.ContainsData(DataFormats.Html))
+                    {
+                        // Prefer HTML format when available
+                        var htmlData = Clipboard.GetData(DataFormats.Html) as string;
+                        htmlContent = ExtractHtmlFragment(htmlData);
+                        Logger.Log("ClipboardMonitor", "Using HTML format directly from clipboard");
+                    }
+                    
+                    if (string.IsNullOrEmpty(htmlContent) && Clipboard.ContainsData(DataFormats.Rtf))
+                    {
+                        // Fallback to RTF conversion
+                        var rtfContent = Clipboard.GetData(DataFormats.Rtf) as string;
+                        htmlContent = ConvertRtfToHtmlUsingRichTextBox(rtfContent);
+                        Logger.Log("ClipboardMonitor", "Converted RTF to HTML");
+                    }
                     
                     if (!string.IsNullOrEmpty(htmlContent) && htmlContent != _lastClipboardContent)
                     {
@@ -171,33 +187,108 @@ namespace CopyPasta
             }
         }
 
-        private string ConvertRtfToHtml(string? rtfContent)
-        {
-            if (string.IsNullOrEmpty(rtfContent))
-                return "";
 
+        private string ExtractHtmlFragment(string cfHtml)
+        {
             try
             {
-                // Basic RTF to HTML conversion
-                // This is a simplified converter - for production use, consider a dedicated RTF library
-                var html = rtfContent
-                    .Replace(@"\b ", "<strong>").Replace(@"\b0 ", "</strong>")
-                    .Replace(@"\i ", "<em>").Replace(@"\i0 ", "</em>")
-                    .Replace(@"\ul ", "<u>").Replace(@"\ul0 ", "</u>")
-                    .Replace(@"\par", "<br>")
-                    .Replace(@"\line", "<br>");
+                // Windows CF_HTML format includes metadata, we need to extract just the HTML fragment
+                var startHtml = cfHtml.IndexOf("StartHTML:");
+                var endHtml = cfHtml.IndexOf("EndHTML:");
+                var startFragment = cfHtml.IndexOf("StartFragment:");
+                var endFragment = cfHtml.IndexOf("EndFragment:");
 
-                // Remove RTF control codes (basic cleanup)
-                html = System.Text.RegularExpressions.Regex.Replace(html, @"\\[a-z]+\d*\s?", "");
-                html = System.Text.RegularExpressions.Regex.Replace(html, @"[{}]", "");
+                if (startFragment >= 0 && endFragment >= 0)
+                {
+                    var fragmentStart = cfHtml.IndexOf("<!--StartFragment-->");
+                    var fragmentEnd = cfHtml.IndexOf("<!--EndFragment-->");
+                    
+                    if (fragmentStart >= 0 && fragmentEnd >= 0)
+                    {
+                        fragmentStart += "<!--StartFragment-->".Length;
+                        var fragment = cfHtml.Substring(fragmentStart, fragmentEnd - fragmentStart).Trim();
+                        
+                        // Clean up the fragment - remove any remaining CF_HTML artifacts
+                        fragment = System.Text.RegularExpressions.Regex.Replace(fragment, @"Version:\d+\.\d+\s*", "");
+                        fragment = System.Text.RegularExpressions.Regex.Replace(fragment, @"StartHTML:\d+\s*", "");
+                        fragment = System.Text.RegularExpressions.Regex.Replace(fragment, @"EndHTML:\d+\s*", "");
+                        fragment = System.Text.RegularExpressions.Regex.Replace(fragment, @"StartFragment:\d+\s*", "");
+                        fragment = System.Text.RegularExpressions.Regex.Replace(fragment, @"EndFragment:\d+\s*", "");
+                        
+                        return fragment;
+                    }
+                }
 
-                return $"<div>{html.Trim()}</div>";
+                // If fragment markers not found, try to extract HTML content directly
+                var htmlBodyMatch = System.Text.RegularExpressions.Regex.Match(cfHtml, @"<body[^>]*>(.*?)</body>", System.Text.RegularExpressions.RegexOptions.Singleline | System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+                if (htmlBodyMatch.Success)
+                {
+                    return htmlBodyMatch.Groups[1].Value.Trim();
+                }
+
+                // Last attempt - look for any HTML-like content
+                var htmlMatch = System.Text.RegularExpressions.Regex.Match(cfHtml, @"<[^>]+>.*", System.Text.RegularExpressions.RegexOptions.Singleline);
+                if (htmlMatch.Success)
+                {
+                    return htmlMatch.Value;
+                }
+
+                return "";
             }
             catch (Exception ex)
             {
-                Logger.LogError("ClipboardMonitor", "Error converting RTF to HTML", ex);
-                // Fallback to plain text
-                return Clipboard.GetText();
+                Logger.LogError("ClipboardMonitor", "Error extracting HTML fragment", ex);
+                return "";
+            }
+        }
+
+        private string ConvertRtfToHtmlUsingRichTextBox(string rtfContent)
+        {
+            try
+            {
+                Logger.Log("ClipboardMonitor", "Converting RTF to HTML using RichTextBox");
+                
+                // Use a RichTextBox to properly convert RTF to HTML
+                using var richTextBox = new System.Windows.Forms.RichTextBox();
+                richTextBox.Rtf = rtfContent;
+                
+                // Get the plain text content
+                var plainText = richTextBox.Text;
+                
+                // If there's no actual text content, return empty
+                if (string.IsNullOrEmpty(plainText.Trim()))
+                {
+                    return "";
+                }
+                
+                // Try to detect if there was actual formatting by checking RTF content
+                var hasFormatting = rtfContent.Contains(@"\b") || rtfContent.Contains(@"\i") || 
+                                  rtfContent.Contains(@"\ul") || rtfContent.Contains(@"\cf") ||
+                                  (rtfContent.Contains(@"\f") && rtfContent.Contains(@"\fs"));
+                
+                if (hasFormatting)
+                {
+                    Logger.Log("ClipboardMonitor", "RTF formatting detected, converting to HTML");
+                    
+                    // For now, preserve the plain text but wrap it properly for HTML
+                    // Future enhancement: could use a proper RTF->HTML converter library
+                    var htmlContent = System.Web.HttpUtility.HtmlEncode(plainText)
+                        .Replace("\r\n", "<br>")
+                        .Replace("\n", "<br>")
+                        .Replace("\r", "<br>");
+                    
+                    return $"<div>{htmlContent}</div>";
+                }
+                else
+                {
+                    Logger.Log("ClipboardMonitor", "No significant RTF formatting detected, returning empty (will fall back to plain text)");
+                    return ""; // Return empty to let the main logic fall back to plain text handling
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError("ClipboardMonitor", "Error in RichTextBox RTF conversion", ex);
+                return "";
             }
         }
 
