@@ -17,7 +17,7 @@ Cross-device clipboard sharing through a web interface. Share text and images be
    docker compose up -d
    ```
 
-3. **Access:** Open `http://localhost:5000` and login with `user` / `password`
+3. **Access:** Open `http://localhost:5000` and register a new account or login with existing credentials
 
 ### Docker Compose File
 
@@ -31,8 +31,6 @@ services:
     restart: unless-stopped
     environment:
       - FLASK_ENV=production
-      - APP_USERNAME=user
-      - APP_PASSWORD=password
       - SECRET_KEY=your-super-secret-key-change-this-in-production
     healthcheck:
       test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:5000/health', timeout=5)"]
@@ -45,8 +43,9 @@ services:
 ## 📱 Client Applications
 
 - **Web Interface** - Works on any device with a browser
+- **macOS Client** - Native macOS application with system clipboard integration
+- **Windows Client** - Native Windows application with system tray support
 - **Linux CLI** - Command-line tool for Linux systems
-- **Windows Client** - Native Windows application
 
 Check the [Releases page](https://github.com/your-repo/copypasta/releases) for the latest client downloads.
 
@@ -65,10 +64,18 @@ copyp  # Paste text
 
 ## 📱 How to Use
 
+### Multi-User Support
+- **Registration:** Create new accounts through the web interface at `/register`
+- **Individual Clipboards:** Each user has their own clipboard history and content
+- **Secure Authentication:** Password-protected accounts with persistent sessions
+
+### Using the Application
+
 1. **Web Interface:**
-   - Login on any device
+   - Register a new account or login with existing credentials
    - Paste content in the text area or upload images
-   - Content appears instantly on all logged-in devices
+   - View clipboard history of your previous entries
+   - Content syncs instantly across all your logged-in devices
    - Click "Copy to Device" to copy text to your clipboard
 
 2. **Cross-Device Access:**
@@ -78,30 +85,36 @@ copyp  # Paste text
 
 ## ⚙️ Configuration
 
-Change default credentials for security:
+### Security Settings
+With multi-user support, you no longer need to set default credentials. Users can register their own accounts through the web interface.
 
 ```yaml
 environment:
-  - APP_USERNAME=your-username
-  - APP_PASSWORD=your-secure-password
-  - SECRET_KEY=your-very-long-random-secret-key
+  - SECRET_KEY=your-very-long-random-secret-key-change-this-in-production
+  - FLASK_ENV=production
 ```
+
+**Important:** Always change the `SECRET_KEY` in production for secure session management.
 
 ## ✨ Features
 
-- **Real-time sync** across all devices
+- **Multi-user support** with individual accounts and clipboard histories
+- **Clipboard history** - Access your previous clipboard entries
+- **Real-time sync** across all devices with long-polling
 - **Text and image support** (PNG, JPG, GIF)
+- **Native clients** for macOS, Windows, and Linux
 - **Push notifications** so your clients know when the central clipboard has changed
 - **Persistent login** until logout
 - **Mobile-friendly** responsive design
-- **Secure authentication** with configurable credentials
+- **Secure authentication** with user registration
 - **Docker deployment** for easy setup
 
 ## 🔒 Security Notes
 
-- **Change default credentials** before network access
-- **Use HTTPS** in production environments
+- **Change SECRET_KEY** for production deployments
+- **Use HTTPS** in production environments  
 - **Firewall protection** for public deployments
+- **User registration** - Each user has their own secure account
 
 ## 🆘 Troubleshooting
 
@@ -109,9 +122,10 @@ environment:
 - Check firewall settings and port 5000 access
 - Use your computer's IP address, not `localhost`
 
-**Login issues:**
-- Verify environment variables are set correctly
-- Clear browser cookies
+**Login/Registration issues:**
+- Clear browser cookies and try again
+- Ensure your username doesn't already exist during registration
+- Check that your password meets the minimum 4-character requirement
 
 **View logs:**
 ```bash
