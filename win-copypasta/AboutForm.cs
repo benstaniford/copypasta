@@ -54,7 +54,7 @@ namespace CopyPasta
             // Copyright
             _copyrightLabel = new Label
             {
-                Text = "© 2024 Ben Staniford",
+                Text = "© 2025 Ben Staniford",
                 Location = new Point(20, 85),
                 Size = new Size(310, 20),
                 TextAlign = ContentAlignment.MiddleCenter

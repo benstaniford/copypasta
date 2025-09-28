@@ -6,4 +6,4 @@ copyp (1.0.0-1) unstable; urgency=medium
   * Configuration management in ~/.config/copyp.rc
   * Support for text and image clipboard content
 
- -- CopyPasta <noreply@copypasta.dev>  Fri, 27 Sep 2024 00:00:00 +0000
+ -- CopyPasta <noreply@copypasta.dev>  Fri, 27 Sep 2025 00:00:00 +0000

@@ -59,7 +59,7 @@ struct AboutView: View {
                 .foregroundColor(.secondary)
             
             // Copyright
-            Text("© 2024 Ben Staniford")
+            Text("© 2025 Ben Staniford")
                 .font(.subheadline)
                 .foregroundColor(.secondary)
             
