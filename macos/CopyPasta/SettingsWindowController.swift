@@ -46,6 +46,7 @@ class SettingsWindowController: NSWindowController {
                 self?.saveSettings()
             },
             onCancel: { [weak self] in
+                Logger.log("SettingsWindowController", "Cancel button clicked")
                 self?.close()
             }
         )
@@ -61,7 +62,9 @@ class SettingsWindowController: NSWindowController {
     }
     
     private func saveSettings() {
+        Logger.log("SettingsWindowController", "Save button clicked")
         delegate?.settingsDidChange(settings)
+        Logger.log("SettingsWindowController", "Closing settings window")
         close()
     }
 }
@@ -129,11 +132,13 @@ struct SettingsView: View {
                 Spacer()
                 
                 Button("Cancel") {
+                    print("Cancel button tapped")
                     onCancel()
                 }
                 .keyboardShortcut(.escape)
                 
                 Button("Save") {
+                    print("Save button tapped")
                     onSave()
                 }
                 .keyboardShortcut(.defaultAction)
