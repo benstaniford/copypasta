@@ -29,13 +29,7 @@
       "Bash(docker exec:*)",
       "Bash(docker system prune:*)",
       "Bash(docker tag:*)",
-      "Bash(docker rm:*)",
-      "Bash(gh run list:*)",
-      "Bash(git tag:*)",
-      "Bash(docker pull:*)",
-      "Bash(docker images:*)",
-      "Bash(git rev-parse:*)",
-      "Bash(docker inspect:*)"
+      "Bash(docker rm:*)"
     ],
     "deny": [],
     "ask": []
