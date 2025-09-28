@@ -125,10 +125,10 @@ namespace CopyPasta
                     using var key = Registry.LocalMachine.OpenSubKey(@"SOFTWARE\CopyPasta");
                     if (key != null)
                     {
-                        var version = key.GetValue("Version")?.ToString();
-                        if (!string.IsNullOrEmpty(version))
+                        var registryVersion = key.GetValue("Version")?.ToString();
+                        if (!string.IsNullOrEmpty(registryVersion))
                         {
-                            return version;
+                            return registryVersion;
                         }
                     }
                 }
@@ -146,10 +146,10 @@ namespace CopyPasta
                 }
 
                 // Priority 3: Try to get version from assembly (least reliable for installed apps)
-                var version = assembly.GetName().Version;
-                if (version != null && version.ToString() != "0.0.0.0" && version.ToString() != "1.0.0.0")
+                var assemblyVersion = assembly.GetName().Version;
+                if (assemblyVersion != null && assemblyVersion.ToString() != "0.0.0.0" && assemblyVersion.ToString() != "1.0.0.0")
                 {
-                    return version.ToString();
+                    return assemblyVersion.ToString();
                 }
 
                 // Priority 4: Fallback to uninstall registry entries
