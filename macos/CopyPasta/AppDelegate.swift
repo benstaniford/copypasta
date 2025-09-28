@@ -125,7 +125,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 // MARK: - StatusBarController Delegate
 extension AppDelegate: StatusBarControllerDelegate {
     func statusBarControllerDidRequestOnlineClips() {
-        Logger.log("AppDelegate", "Online Clips requested")
+        Logger.log("AppDelegate", "Clip History requested")
         openOnlineClips()
     }
     

@@ -75,7 +75,7 @@ namespace CopyPasta
                 Font = new Font(contextMenu.Font, FontStyle.Bold)
             };
             
-            var onlineClipsItem = new ToolStripMenuItem("Online Clips...");
+            var onlineClipsItem = new ToolStripMenuItem("Clip History...");
             onlineClipsItem.Click += OnlineClipsItem_Click;
             
             var settingsItem = new ToolStripMenuItem("Settings...");
@@ -174,7 +174,7 @@ namespace CopyPasta
 
         private void OnlineClipsItem_Click(object? sender, EventArgs e)
         {
-            Logger.Log("TrayApp", "Online Clips menu clicked");
+            Logger.Log("TrayApp", "Clip History menu clicked");
             OpenOnlineClips();
         }
 

@@ -87,8 +87,8 @@ class StatusBarController: NSObject {
         
         menu.addItem(NSMenuItem.separator())
         
-        // Online Clips
-        let onlineClipsItem = NSMenuItem(title: "Online Clips...", action: #selector(onlineClipsClicked), keyEquivalent: "")
+        // Clip History
+        let onlineClipsItem = NSMenuItem(title: "Clip History...", action: #selector(onlineClipsClicked), keyEquivalent: "")
         onlineClipsItem.target = self
         onlineClipsItem.isEnabled = true
         menu.addItem(onlineClipsItem)
