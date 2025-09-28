@@ -17,6 +17,7 @@
 		1A000008000000000000001 /* AboutWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A000008000000000000001 /* AboutWindowController.swift */; };
 		1A000009000000000000001 /* AccessibilityPermissionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A000009000000000000001 /* AccessibilityPermissionManager.swift */; };
 		1A00000A000000000000001 /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A00000A000000000000001 /* main.swift */; };
+		1A00000B000000000000001 /* icon.icns in Resources */ = {isa = PBXBuildFile; fileRef = 2A00000B000000000000001 /* icon.icns */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -31,6 +32,7 @@
 		2A000008000000000000001 /* AboutWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AboutWindowController.swift; sourceTree = "<group>"; };
 		2A000009000000000000001 /* AccessibilityPermissionManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccessibilityPermissionManager.swift; sourceTree = "<group>"; };
 		2A00000A000000000000001 /* main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = main.swift; sourceTree = "<group>"; };
+		2A00000B000000000000001 /* icon.icns */ = {isa = PBXFileReference; lastKnownFileType = image.icns; name = icon.icns; path = ../icon.icns; sourceTree = "<group>"; };
 		4A000001000000000000001 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -43,6 +45,17 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXResourcesBuildPhase section */
+		CB000001000000000000001 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				1A00000B000000000000001 /* icon.icns in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
 
 /* Begin PBXGroup section */
 		6A000001000000000000001 = {
@@ -66,6 +79,7 @@
 				2A000008000000000000001 /* AboutWindowController.swift */,
 				2A000009000000000000001 /* AccessibilityPermissionManager.swift */,
 				2A00000A000000000000001 /* main.swift */,
+				2A00000B000000000000001 /* icon.icns */,
 				4A000001000000000000001 /* Info.plist */,
 			);
 			path = CopyPasta;
@@ -87,6 +101,7 @@
 			buildConfigurationList = AA000001000000000000001 /* Build configuration list for PBXNativeTarget "CopyPasta" */;
 			buildPhases = (
 				5A000001000000000000001 /* Frameworks */,
+				CB000001000000000000001 /* Resources */,
 				BA000001000000000000001 /* Sources */,
 			);
 			buildRules = (
