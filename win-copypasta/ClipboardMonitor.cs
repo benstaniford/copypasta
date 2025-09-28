@@ -126,16 +126,22 @@ namespace CopyPasta
                     {
                         // Prefer HTML format when available
                         var htmlData = Clipboard.GetData(DataFormats.Html) as string;
-                        htmlContent = ExtractHtmlFragment(htmlData);
-                        Logger.Log("ClipboardMonitor", "Using HTML format directly from clipboard");
+                        if (!string.IsNullOrEmpty(htmlData))
+                        {
+                            htmlContent = ExtractHtmlFragment(htmlData);
+                            Logger.Log("ClipboardMonitor", "Using HTML format directly from clipboard");
+                        }
                     }
                     
                     if (string.IsNullOrEmpty(htmlContent) && Clipboard.ContainsData(DataFormats.Rtf))
                     {
                         // Fallback to RTF conversion
                         var rtfContent = Clipboard.GetData(DataFormats.Rtf) as string;
-                        htmlContent = ConvertRtfToHtmlUsingRichTextBox(rtfContent);
-                        Logger.Log("ClipboardMonitor", "Converted RTF to HTML");
+                        if (!string.IsNullOrEmpty(rtfContent))
+                        {
+                            htmlContent = ConvertRtfToHtmlUsingRichTextBox(rtfContent);
+                            Logger.Log("ClipboardMonitor", "Converted RTF to HTML");
+                        }
                     }
                     
                     if (!string.IsNullOrEmpty(htmlContent) && htmlContent != _lastClipboardContent)
