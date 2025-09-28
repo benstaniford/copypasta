@@ -3,7 +3,7 @@ import os
 from functools import wraps
 import base64
 from datetime import datetime, timedelta
-from database import init_db, save_clipboard_entry, get_clipboard_entry, get_clipboard_version, wait_for_clipboard_change, authenticate_user, create_user
+from database import init_db, save_clipboard_entry, get_clipboard_entry, get_clipboard_history, get_clipboard_version, wait_for_clipboard_change, authenticate_user, create_user
 from PIL import Image
 import io
 
@@ -163,6 +163,23 @@ def get_clipboard():
                 'data': None,
                 'message': 'No clipboard content found'
             })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/clipboard/history')
+@login_required
+def get_clipboard_history_api():
+    """Get clipboard history for the current user"""
+    try:
+        user_id = session.get('user_id')
+        limit = request.args.get('limit', 10, type=int)
+        limit = max(1, min(limit, 50))  # Limit between 1 and 50
+        
+        history = get_clipboard_history(user_id, limit)
+        return jsonify({
+            'status': 'success',
+            'data': history
+        })
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 

@@ -87,16 +87,13 @@ def clear_clipboard(user_id):
     conn.close()
 
 def save_clipboard_entry(user_id, content_type, content, metadata=None, client_id=None):
-    """Save a new clipboard entry for a user, removing any existing ones for that user"""
+    """Save a new clipboard entry for a user, maintaining history with FIFO deletion (max 10 entries)"""
     conn = sqlite3.connect(DATABASE_PATH)
     cursor = conn.cursor()
     
     try:
         # Start transaction for atomic operation
         cursor.execute('BEGIN IMMEDIATE')
-        
-        # Clear existing entries for this user
-        cursor.execute('DELETE FROM clipboard_entries WHERE user_id = ?', (user_id,))
         
         # Increment version counter for this user
         cursor.execute('''
@@ -113,6 +110,18 @@ def save_clipboard_entry(user_id, content_type, content, metadata=None, client_i
             INSERT INTO clipboard_entries (user_id, content_type, content, metadata, created_at, version, client_id)
             VALUES (?, ?, ?, ?, ?, ?, ?)
         ''', (user_id, content_type, content, metadata, datetime.now().isoformat(), version, client_id))
+        
+        # Maintain FIFO history - keep only the 10 most recent entries per user
+        cursor.execute('''
+            DELETE FROM clipboard_entries 
+            WHERE user_id = ? 
+            AND id NOT IN (
+                SELECT id FROM clipboard_entries 
+                WHERE user_id = ? 
+                ORDER BY created_at DESC 
+                LIMIT 10
+            )
+        ''', (user_id, user_id))
         
         # Commit transaction
         conn.commit()
@@ -153,6 +162,36 @@ def get_clipboard_entry(user_id):
             'client_id': result[5]
         }
     return None
+
+def get_clipboard_history(user_id, limit=10):
+    """Get clipboard history for a user (excluding the current/most recent entry)"""
+    conn = sqlite3.connect(DATABASE_PATH)
+    cursor = conn.cursor()
+    
+    cursor.execute('''
+        SELECT id, content_type, content, metadata, created_at, version, client_id
+        FROM clipboard_entries
+        WHERE user_id = ?
+        ORDER BY created_at DESC
+        LIMIT ? OFFSET 1
+    ''', (user_id, limit))
+    
+    results = cursor.fetchall()
+    conn.close()
+    
+    history = []
+    for result in results:
+        history.append({
+            'id': result[0],
+            'content_type': result[1],
+            'content': result[2],
+            'metadata': result[3],
+            'created_at': result[4],
+            'version': result[5],
+            'client_id': result[6]
+        })
+    
+    return history
 
 def get_clipboard_version(user_id):
     """Get the current clipboard version for a user from database"""
