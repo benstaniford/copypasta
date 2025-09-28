@@ -6,6 +6,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     override init() {
         super.init()
         print("CopyPasta: AppDelegate init called")
+        NSLog("CopyPasta: AppDelegate init called with NSLog")
         Logger.log("AppDelegate", "AppDelegate initialized")
     }
     
@@ -14,10 +15,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var copyPastaClient: CopyPastaClient!
     
     func applicationDidFinishLaunching(_ notification: Notification) {
+        print("CopyPasta: applicationDidFinishLaunching called")
+        NSLog("CopyPasta: applicationDidFinishLaunching called with NSLog")
         Logger.log("AppDelegate", "Application starting up")
         
         // Initialize components on main thread
         DispatchQueue.main.async {
+            print("CopyPasta: Starting setup on main thread")
+            NSLog("CopyPasta: Starting setup on main thread")
             self.setupApplication()
             self.startServices()
             Logger.log("AppDelegate", "Application startup complete")
@@ -35,25 +40,34 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
     
     private func setupApplication() {
+        print("CopyPasta: setupApplication started")
+        NSLog("CopyPasta: setupApplication started")
         Logger.log("AppDelegate", "Setting activation policy...")
+        
         // Hide from Dock (we're a status bar only app)
         NSApp.setActivationPolicy(.accessory)
+        print("CopyPasta: Set activation policy to accessory")
         
         Logger.log("AppDelegate", "Initializing status bar controller...")
         // Initialize status bar controller
+        print("CopyPasta: About to create StatusBarController")
         statusBarController = StatusBarController()
+        print("CopyPasta: StatusBarController created, setting delegate")
         statusBarController.delegate = self
         
         Logger.log("AppDelegate", "Initializing CopyPasta client...")
         // Initialize client
+        print("CopyPasta: About to create CopyPastaClient")
         copyPastaClient = CopyPastaClient()
         copyPastaClient.delegate = self
         
         Logger.log("AppDelegate", "Initializing clipboard monitor...")
         // Initialize clipboard monitor
+        print("CopyPasta: About to create ClipboardMonitor")
         clipboardMonitor = ClipboardMonitor()
         clipboardMonitor.delegate = self
         
+        print("CopyPasta: All components created successfully")
         Logger.log("AppDelegate", "Setup application complete")
     }
     
