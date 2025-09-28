@@ -15,15 +15,23 @@ class StatusBarController: NSObject {
     private var menu: NSMenu
     
     override init() {
+        Logger.log("StatusBarController", "Initializing status bar controller...")
+        
         // Create status item
+        Logger.log("StatusBarController", "Creating status item...")
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         menu = NSMenu()
         
         super.init()
         
+        Logger.log("StatusBarController", "Setting up status item...")
         setupStatusItem()
+        Logger.log("StatusBarController", "Setting up menu...")
         setupMenu()
+        Logger.log("StatusBarController", "Setting up notifications...")
         setupNotifications()
+        
+        Logger.log("StatusBarController", "Status bar controller initialized successfully")
     }
     
     deinit {

@@ -22,10 +22,18 @@ class ClipboardMonitor {
     
     func startMonitoring() {
         Logger.log("ClipboardMonitor", "Starting clipboard monitoring")
-        lastChangeCount = pasteboard.changeCount
         
-        timer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
-            self?.checkForChanges()
+        // Get initial change count on main thread
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            self.lastChangeCount = self.pasteboard.changeCount
+            Logger.log("ClipboardMonitor", "Initial change count: \(self.lastChangeCount)")
+            
+            // Start timer on main thread
+            self.timer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
+                self?.checkForChanges()
+            }
+            Logger.log("ClipboardMonitor", "Timer started successfully")
         }
     }
     

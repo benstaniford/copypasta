@@ -29,10 +29,14 @@ class Settings: ObservableObject {
     private let userDefaults = UserDefaults.standard
     
     private init() {
+        Logger.log("Settings", "Initializing settings...")
+        
         serverEndpoint = userDefaults.string(forKey: "serverEndpoint") ?? "http://localhost:5000"
         username = userDefaults.string(forKey: "username") ?? ""
         password = userDefaults.string(forKey: "password") ?? ""
         showNotifications = userDefaults.object(forKey: "showNotifications") as? Bool ?? true
+        
+        Logger.log("Settings", "Loaded settings - endpoint: \(serverEndpoint), username: \(username.isEmpty ? "empty" : "set")")
         
         // Override settings if running in debug mode
         #if DEBUG
@@ -43,6 +47,8 @@ class Settings: ObservableObject {
             password = "password"
         }
         #endif
+        
+        Logger.log("Settings", "Settings initialization complete")
     }
     
     private func save() {

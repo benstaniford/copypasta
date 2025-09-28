@@ -10,11 +10,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         Logger.log("AppDelegate", "Application starting up")
         
-        // Initialize components
-        setupApplication()
-        startServices()
-        
-        Logger.log("AppDelegate", "Application startup complete")
+        // Initialize components on main thread
+        DispatchQueue.main.async {
+            self.setupApplication()
+            self.startServices()
+            Logger.log("AppDelegate", "Application startup complete")
+        }
     }
     
     func applicationWillTerminate(_ notification: Notification) {
@@ -28,32 +29,46 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
     
     private func setupApplication() {
+        Logger.log("AppDelegate", "Setting activation policy...")
         // Hide from Dock (we're a status bar only app)
         NSApp.setActivationPolicy(.accessory)
         
+        Logger.log("AppDelegate", "Initializing status bar controller...")
         // Initialize status bar controller
         statusBarController = StatusBarController()
         statusBarController.delegate = self
         
+        Logger.log("AppDelegate", "Initializing CopyPasta client...")
         // Initialize client
         copyPastaClient = CopyPastaClient()
         copyPastaClient.delegate = self
         
+        Logger.log("AppDelegate", "Initializing clipboard monitor...")
         // Initialize clipboard monitor
         clipboardMonitor = ClipboardMonitor()
         clipboardMonitor.delegate = self
+        
+        Logger.log("AppDelegate", "Setup application complete")
     }
     
     private func startServices() {
+        Logger.log("AppDelegate", "Loading settings...")
         // Load settings and start client if configured
         let settings = Settings.shared
+        
+        Logger.log("AppDelegate", "Settings configured: \(settings.isConfigured)")
         if settings.isConfigured {
+            Logger.log("AppDelegate", "Updating client settings...")
             copyPastaClient.updateSettings(settings)
+            Logger.log("AppDelegate", "Starting polling...")
             copyPastaClient.startPolling()
         }
         
+        Logger.log("AppDelegate", "Starting clipboard monitoring...")
         // Start clipboard monitoring
         clipboardMonitor.startMonitoring()
+        
+        Logger.log("AppDelegate", "All services started")
     }
     
     private func cleanup() {
