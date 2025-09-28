@@ -16,13 +16,24 @@ app.secret_key = os.environ.get('SECRET_KEY', 'your-secret-key-change-this-in-pr
 # Configure session to be permanent and last forever
 app.permanent_session_lifetime = timedelta(days=365 * 10)  # 10 years
 
-# Setup logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+# Setup logging that works with Gunicorn
+if __name__ != '__main__':
+    # When running under Gunicorn, use Gunicorn's logger
+    gunicorn_logger = logging.getLogger('gunicorn.error')
+    app.logger.handlers = gunicorn_logger.handlers
+    app.logger.setLevel(gunicorn_logger.level)
+    logger = app.logger
+else:
+    # When running directly, use basic config
+    logging.basicConfig(level=logging.INFO)
+    logger = logging.getLogger(__name__)
 
 # Get and log application version
 app_version = get_cached_version()
 numeric_version = get_numeric_version(app_version)
+
+# Log version using print for immediate visibility and logger for proper logging
+print(f"🚀 CopyPasta v{numeric_version} - Flask app initialized")
 logger.info(f"🚀 CopyPasta v{numeric_version} starting up...")
 
 # Initialize database on startup
