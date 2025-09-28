@@ -1,6 +1,6 @@
 # CopyPasta 📋
 
-Cross-device clipboard sharing through a web interface. Share text and images between your devices instantly.  A docker container maintains the clipboard history and your devices can access it via the web or via native clients that watch system clipboards.
+Cross-device clipboard sharing. Share text and images between all your devices instantly.  A docker container maintains the clipboard history and your devices can access it via the web or via native clients that watch system clipboards.
 
 ## 🚀 Quick Start
 
