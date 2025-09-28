@@ -113,8 +113,66 @@ jobs:
           path: copypasta-docker-${{ steps.version.outputs.VERSION }}.tar.gz
 
 
+  build-macos:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Extract version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "VERSION=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+          else
+            echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+          fi
+          NUMERIC_VERSION=$(echo "${{ github.event_name == 'workflow_dispatch' && github.event.inputs.version || github.ref_name }}" | sed 's/^v//')
+          echo "NUMERIC_VERSION=$NUMERIC_VERSION" >> $GITHUB_OUTPUT
+
+      - name: Update version in project
+        run: |
+          cd macos
+          # Update the marketing version in the project file
+          sed -i '' 's/MARKETING_VERSION = 1.0;/MARKETING_VERSION = ${{ steps.version.outputs.NUMERIC_VERSION }};/g' CopyPasta.xcodeproj/project.pbxproj
+
+      - name: Build macOS app (Intel only)
+        run: |
+          cd macos
+          xcodebuild -project CopyPasta.xcodeproj \
+            -scheme CopyPasta \
+            -configuration Release \
+            -arch x86_64 \
+            -derivedDataPath build \
+            build
+          
+          # Copy the built app
+          cp -R build/Build/Products/Release/CopyPasta.app ./
+
+      - name: Create DMG
+        run: |
+          cd macos
+          # Create a temporary directory for DMG contents
+          mkdir -p dmg-contents
+          cp -R CopyPasta.app dmg-contents/
+          
+          # Create symlink to Applications folder
+          ln -s /Applications dmg-contents/Applications
+          
+          # Create DMG
+          hdiutil create -volname "CopyPasta ${{ steps.version.outputs.NUMERIC_VERSION }}" \
+            -srcfolder dmg-contents \
+            -ov -format UDZO \
+            CopyPasta-${{ steps.version.outputs.NUMERIC_VERSION }}-intel.dmg
+
+      - name: Upload macOS artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: copypasta-macos
+          path: macos/CopyPasta-${{ steps.version.outputs.NUMERIC_VERSION }}-intel.dmg
+
   create-release:
-    needs: [build-linux-cli, build-docker]
+    needs: [build-linux-cli, build-docker, build-macos]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -148,6 +206,9 @@ jobs:
           
           ## Downloads
           
+          ### macOS
+          - **CopyPasta-${{ steps.version.outputs.NUMERIC_VERSION }}-intel.dmg** - macOS application (Intel Macs)
+          
           ### Linux CLI
           - **copyp_${{ steps.version.outputs.NUMERIC_VERSION }}-1_all.deb** - Debian package for Linux CLI tool
           
@@ -157,6 +218,7 @@ jobs:
           ## Features
           
           - 🌐 **Web Interface**: Access clipboard from any device with a web browser
+          - 🍎 **macOS Status Bar App**: Native macOS application with system integration
           - 🖥️ **Linux CLI Tool**: Command-line interface for seamless clipboard sharing
           - 📝 **Text Support**: Share text content across devices
           - 🖼️ **Image Support**: Copy and paste images across devices
@@ -165,6 +227,13 @@ jobs:
           - 💾 **SQLite Database**: Persistent clipboard storage
           
           ## Installation
+          
+          ### macOS Application
+          1. Download `CopyPasta-${{ steps.version.outputs.NUMERIC_VERSION }}-intel.dmg`
+          2. Open the DMG file
+          3. Drag CopyPasta.app to the Applications folder
+          4. Launch CopyPasta from Applications
+          5. Configure your server settings via the status bar menu
           
           ### Linux CLI Tool
           ```bash
@@ -205,6 +274,7 @@ jobs:
           ## System Requirements
           
           - **Server**: Docker or Python 3.11+
+          - **macOS App**: macOS 11.0 (Big Sur) or later, Intel Mac
           - **Linux CLI**: Python 3.8+ (included with most Linux distributions)
           
           EOF
@@ -254,3 +324,15 @@ jobs:
           echo "Uploading Docker image to release..."
           gh release upload "$VERSION" "$DOCKER_ASSET" --clobber
           echo "✓ Docker image uploaded successfully"
+
+      - name: Upload macOS DMG
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION="${{ steps.version.outputs.VERSION }}"
+          NUMERIC_VERSION="${{ steps.version.outputs.NUMERIC_VERSION }}"
+          MACOS_ASSET="artifacts/copypasta-macos/CopyPasta-${NUMERIC_VERSION}-intel.dmg"
+          
+          echo "Uploading macOS DMG to release..."
+          gh release upload "$VERSION" "$MACOS_ASSET" --clobber
+          echo "✓ macOS DMG uploaded successfully"
