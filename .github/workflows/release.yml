@@ -260,7 +260,8 @@ jobs:
         run: |
           $originalPath = "win-copypasta/CopyPasta.Installer/bin/Release/CopyPastaInstaller.msi"
           $version = "${{ steps.version.outputs.NUMERIC_VERSION }}"
-          $newPath = "win-copypasta/CopyPasta.Installer/bin/Release/CopyPastaInstaller-v$version.msi"
+          $newFileName = "CopyPastaInstaller-v$version.msi"
+          $newPath = "win-copypasta/CopyPasta.Installer/bin/Release/$newFileName"
           
           if (Test-Path $originalPath) {
             Write-Host "✓ MSI file found: $originalPath"
@@ -268,7 +269,7 @@ jobs:
             Write-Host "✓ MSI size: $([math]::Round($size / 1MB, 2)) MB"
             
             # Rename the file to include version
-            Rename-Item $originalPath $newPath
+            Rename-Item -Path $originalPath -NewName $newFileName
             Write-Host "✓ MSI renamed to: $newPath"
           } else {
             Write-Host "✗ MSI file not found: $originalPath"
