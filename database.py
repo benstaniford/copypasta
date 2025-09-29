@@ -155,8 +155,9 @@ def get_clipboard_entry(user_id):
     if result:
         # Ensure created_at is formatted as UTC timestamp
         created_at = result[3]
-        if created_at and not created_at.endswith('Z'):
-            created_at = created_at.replace(' ', 'T') + 'Z'
+        if created_at and not created_at.endswith('Z') and not created_at.endswith('+00:00'):
+            # SQLite CURRENT_TIMESTAMP format: convert to ISO format with UTC indicator
+            created_at = created_at.replace(' ', 'T') + '+00:00'
         
         return {
             'content_type': result[0],
@@ -188,8 +189,9 @@ def get_clipboard_history(user_id, limit=10):
     for result in results:
         # Ensure created_at is formatted as UTC timestamp
         created_at = result[4]
-        if created_at and not created_at.endswith('Z'):
-            created_at = created_at.replace(' ', 'T') + 'Z'
+        if created_at and not created_at.endswith('Z') and not created_at.endswith('+00:00'):
+            # SQLite CURRENT_TIMESTAMP format: convert to ISO format with UTC indicator
+            created_at = created_at.replace(' ', 'T') + '+00:00'
         
         history.append({
             'id': result[0],

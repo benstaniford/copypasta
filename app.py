@@ -3,7 +3,7 @@ import os
 import logging
 from functools import wraps
 import base64
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from database import init_db, save_clipboard_entry, get_clipboard_entry, get_clipboard_history, get_clipboard_version, wait_for_clipboard_change, authenticate_user, create_user
 from PIL import Image
 import io
@@ -154,7 +154,7 @@ def paste():
         
         # Save to database
         metadata = {
-            'timestamp': datetime.utcnow().isoformat() + 'Z',
+            'timestamp': datetime.now(timezone.utc).isoformat(),
             'user_agent': request.headers.get('User-Agent', '')
         }
         
@@ -164,7 +164,7 @@ def paste():
         return jsonify({
             'status': 'success',
             'message': 'Content saved to clipboard',
-            'timestamp': datetime.utcnow().isoformat() + 'Z'
+            'timestamp': datetime.now(timezone.utc).isoformat()
         })
         
     except Exception as e:
