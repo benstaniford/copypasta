@@ -32,7 +32,9 @@
       "Bash(docker rm:*)",
       "Bash(git tag:*)",
       "Bash(git describe:*)",
-      "Bash(timeout:*)"
+      "Bash(timeout:*)",
+      "Bash(lsof:*)",
+      "Bash(sudo fuser:*)"
     ],
     "deny": [],
     "ask": []

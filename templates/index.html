@@ -767,8 +767,18 @@
 
         function updateTimestamp(timestamp) {
             const element = document.getElementById('lastUpdated');
+            // Ensure timestamp is treated as UTC
             const date = new Date(timestamp);
-            element.textContent = 'Last updated: ' + date.toLocaleString();
+            const options = {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit',
+                timeZoneName: 'short'
+            };
+            element.textContent = 'Last updated: ' + date.toLocaleString(navigator.language, options);
         }
 
         async function copyContent() {
@@ -895,7 +905,16 @@
 
         function createHistoryItem(item, index) {
             const date = new Date(item.created_at);
-            const formattedDate = date.toLocaleString();
+            const options = {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit',
+                timeZoneName: 'short'
+            };
+            const formattedDate = date.toLocaleString(navigator.language, options);
             
             // Create preview text based on content type
             let previewText = '';
