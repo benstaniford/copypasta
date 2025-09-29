@@ -154,7 +154,7 @@ def paste():
         
         # Save to database
         metadata = {
-            'timestamp': datetime.utcnow().isoformat() + 'Z',
+            'timestamp': datetime.now().isoformat(),
             'user_agent': request.headers.get('User-Agent', '')
         }
         
@@ -164,7 +164,7 @@ def paste():
         return jsonify({
             'status': 'success',
             'message': 'Content saved to clipboard',
-            'timestamp': datetime.utcnow().isoformat() + 'Z'
+            'timestamp': datetime.now().isoformat()
         })
         
     except Exception as e:

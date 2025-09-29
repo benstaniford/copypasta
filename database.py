@@ -153,16 +153,11 @@ def get_clipboard_entry(user_id):
     conn.close()
     
     if result:
-        # Ensure created_at is formatted as UTC timestamp
-        created_at = result[3]
-        if created_at and not created_at.endswith('Z'):
-            created_at = created_at.replace(' ', 'T') + 'Z'
-        
         return {
             'content_type': result[0],
             'content': result[1],
             'metadata': result[2],
-            'created_at': created_at,
+            'created_at': result[3],
             'version': result[4],
             'client_id': result[5]
         }
@@ -186,17 +181,12 @@ def get_clipboard_history(user_id, limit=10):
     
     history = []
     for result in results:
-        # Ensure created_at is formatted as UTC timestamp
-        created_at = result[4]
-        if created_at and not created_at.endswith('Z'):
-            created_at = created_at.replace(' ', 'T') + 'Z'
-        
         history.append({
             'id': result[0],
             'content_type': result[1],
             'content': result[2],
             'metadata': result[3],
-            'created_at': created_at,
+            'created_at': result[4],
             'version': result[5],
             'client_id': result[6]
         })
