@@ -32,7 +32,8 @@
       "Bash(docker rm:*)",
       "Bash(git tag:*)",
       "Bash(git describe:*)",
-      "Bash(timeout:*)"
+      "Bash(timeout:*)",
+      "Bash(xargs git tag:*)"
     ],
     "deny": [],
     "ask": []

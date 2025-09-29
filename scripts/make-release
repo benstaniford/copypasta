@@ -23,7 +23,56 @@ fi
 echo "Latest tag: $LATEST_TAG"
 echo "New tag: $NEW_TAG"
 
-git tag "$NEW_TAG"
+# Generate release notes using Claude CLI
+echo "Generating release notes with Claude CLI..."
+
+# Get git log since last tag
+if [[ -z "$LATEST_TAG" ]]; then
+  GIT_LOG=$(git log --oneline)
+else
+  GIT_LOG=$(git log ${LATEST_TAG}..HEAD --oneline)
+fi
+
+# Create prompt for Claude
+PROMPT="Generate release notes for version ${NEW_TAG} of CopyPasta.
+
+CopyPasta is a cross-device clipboard sharing application built with Flask. It allows multiple users to share text and images between their devices through a web interface and native clients (macOS, Windows, Linux).
+
+Key features of CopyPasta:
+- Multi-user authentication with secure password hashing
+- Cross-device clipboard synchronization (text and images)
+- Native desktop clients for macOS, Windows, and Linux
+- Real-time content sync with long-polling
+- Clipboard history with configurable limits
+- Docker containerization for easy deployment
+- SQLite database for persistent storage
+
+Here are the commits since the last release (${LATEST_TAG}):
+
+${GIT_LOG}
+
+Please write release notes that:
+1. Start with a prominent section highlighting the key changes and new features from these commits
+2. Include a brief overview of CopyPasta's main features for new users
+3. Use clear, user-friendly language
+4. Format in Markdown
+5. Keep it concise but informative
+
+Format the output as plain text release notes (no markdown code blocks)."
+
+# Call Claude CLI and capture output
+RELEASE_NOTES=$(claude -p "$PROMPT")
+
+# Create annotated tag with release notes
+echo "Creating annotated tag with release notes..."
+git tag -a "$NEW_TAG" -m "$RELEASE_NOTES"
+
+# Push tag to remote
 git push origin "$NEW_TAG"
 
+echo ""
 echo "Release $NEW_TAG created and pushed."
+echo ""
+echo "Release notes:"
+echo "============================================"
+echo "$RELEASE_NOTES"
