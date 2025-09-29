@@ -436,6 +436,16 @@
             margin-bottom: 0.75rem;
         }
         
+        .version-link {
+            color: #888;
+            text-decoration: none;
+            transition: all 0.2s ease;
+        }
+        
+        .version-link:hover {
+            color: #4a9eff;
+        }
+        
         .download-links {
             display: flex;
             justify-content: center;
@@ -534,7 +544,10 @@
             <!-- Version and Download Footer -->
             <div class="app-footer">
                 <div class="version-info">
-                    CopyPasta {{ version }}
+                    <a href="https://github.com/benstaniford/copypasta" 
+                       class="version-link" 
+                       target="_blank" 
+                       title="View project on GitHub">CopyPasta {{ version }}</a>
                 </div>
                 <div class="download-links">
                     <a href="https://github.com/benstaniford/copypasta/releases/download/v{{ version }}/CopyPastaInstaller-v{{ version }}.msi" 
