@@ -291,6 +291,54 @@ def api_version():
         'status': 'success'
     })
 
+@app.route('/download/ios-shortcut')
+@login_required
+def download_ios_shortcut():
+    """Generate and serve iOS Shortcut for current user"""
+    from flask import make_response
+    import plistlib
+
+    username = session.get('username', 'user')
+    server_url = request.host_url.rstrip('/')
+
+    # Create a basic shortcut structure
+    # Note: This creates a simplified URL scheme that iOS Shortcuts can import
+    shortcut_url = f"shortcuts://import-shortcut?url={server_url}/api/ios-shortcut-config&name=Send%20to%20CopyPasta"
+
+    # For now, we'll provide instructions as a JSON response
+    # The actual shortcut file format is proprietary and complex
+    return jsonify({
+        'status': 'success',
+        'message': 'iOS Shortcut Configuration',
+        'instructions': [
+            'Open the Shortcuts app on your iPhone',
+            'Tap the + button to create a new shortcut',
+            'Add these actions:',
+            '1. Get Contents of Clipboard',
+            '2. Get Text from Input',
+            '3. URL: ' + server_url + '/api/paste',
+            '4. Get Contents of URL (Method: POST, Headers: Content-Type=application/json, Body: {"type":"text","content":"[Clipboard]"})',
+            '5. Show Result'
+        ],
+        'server_url': server_url,
+        'username': username,
+        'api_endpoint': server_url + '/api/paste'
+    })
+
+@app.route('/api/ios-shortcut-config')
+@login_required
+def ios_shortcut_config():
+    """Provide configuration for iOS Shortcut"""
+    server_url = request.host_url.rstrip('/')
+    username = session.get('username', 'user')
+
+    return jsonify({
+        'server_url': server_url,
+        'api_endpoint': server_url + '/api/paste',
+        'username': username,
+        'auth_note': 'You must be logged in via Safari first for authentication to work'
+    })
+
 if __name__ == '__main__':
     # For development only - use gunicorn in production
     app.run(host='0.0.0.0', port=5000, debug=False)

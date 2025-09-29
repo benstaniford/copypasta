@@ -474,6 +474,7 @@
         .download-link.windows::before { content: "🪟"; }
         .download-link.mac::before { content: "🍎"; }
         .download-link.linux::before { content: "🐧"; }
+        .download-link.ios::before { content: "📱"; }
         
         @media (max-width: 480px) {
             .download-links {
@@ -550,18 +551,22 @@
                        title="View project on GitHub">CopyPasta {{ version }}</a>
                 </div>
                 <div class="download-links">
-                    <a href="https://github.com/benstaniford/copypasta/releases/download/v{{ version }}/CopyPastaInstaller-v{{ version }}.msi" 
-                       class="download-link windows" 
-                       target="_blank" 
+                    <a href="https://github.com/benstaniford/copypasta/releases/download/v{{ version }}/CopyPastaInstaller-v{{ version }}.msi"
+                       class="download-link windows"
+                       target="_blank"
                        title="Download Windows installer">Windows</a>
-                    <a href="https://github.com/benstaniford/copypasta/releases/download/v{{ version }}/CopyPasta-{{ version }}-intel.dmg" 
-                       class="download-link mac" 
-                       target="_blank" 
+                    <a href="https://github.com/benstaniford/copypasta/releases/download/v{{ version }}/CopyPasta-{{ version }}-intel.dmg"
+                       class="download-link mac"
+                       target="_blank"
                        title="Download macOS application">macOS</a>
-                    <a href="https://github.com/benstaniford/copypasta/releases/download/v{{ version }}/copyp_{{ version }}-1_all.deb" 
-                       class="download-link linux" 
-                       target="_blank" 
+                    <a href="https://github.com/benstaniford/copypasta/releases/download/v{{ version }}/copyp_{{ version }}-1_all.deb"
+                       class="download-link linux"
+                       target="_blank"
                        title="Download Linux CLI package">Linux</a>
+                    <a href="#"
+                       class="download-link ios"
+                       onclick="showiOSShortcutInstructions(); return false;"
+                       title="Get iOS Shortcut instructions">iPhone</a>
                 </div>
             </div>
         </div>
@@ -570,6 +575,62 @@
     <script>
         let currentClipboard = null;
         let historyVisible = false;
+
+        function showiOSShortcutInstructions() {
+            const instructions = `
+=== iOS Shortcut Setup Instructions ===
+
+To create a "Send to CopyPasta" shortcut on your iPhone:
+
+1. Open the Shortcuts app on your iPhone
+2. Tap the + button to create a new shortcut
+3. Tap "Add Action"
+4. Add the following actions in order:
+
+   ACTION 1: "Get Clipboard"
+   - Search for "Get Clipboard" and add it
+
+   ACTION 2: "Get Text from Input"
+   - Search for "Get Text from Input" and add it
+   - Set Input to "Clipboard"
+
+   ACTION 3: "URL"
+   - Search for "URL" and add it
+   - Set the URL to: ${window.location.origin}/api/paste
+
+   ACTION 4: "Get Contents of URL"
+   - Search for "Get Contents of URL" and add it
+   - Set Method to: POST
+   - Add Header: Content-Type = application/json
+   - Set Request Body to: JSON
+   - In the JSON body, add:
+     {
+       "type": "text",
+       "content": [Text from Get Text]
+     }
+   - Tap "Text from Get Text" to reference the previous action
+
+   ACTION 5: "Show Notification" (optional)
+   - Add a notification action to confirm it worked
+   - Set text to: "Sent to CopyPasta!"
+
+5. Tap the settings icon and name it "Send to CopyPasta"
+6. You can now run this shortcut from the Share Sheet!
+
+IMPORTANT: You must be logged into CopyPasta in Safari first,
+as the shortcut will use Safari's cookies for authentication.
+
+Server URL: ${window.location.origin}
+Your username: ${document.querySelector('.logout-btn') ? 'Logged in' : 'Not logged in'}
+            `.trim();
+
+            alert(instructions);
+
+            // Also copy to clipboard for easy reference
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(instructions);
+            }
+        }
 
         // Load clipboard content on page load
         document.addEventListener('DOMContentLoaded', function() {
