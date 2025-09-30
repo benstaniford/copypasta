@@ -191,9 +191,27 @@ class CopyPastaClient:
                         if content.startswith('data:application/octet-stream;base64,'):
                             base64_data = content.split(',', 1)[1]
                             binary_data = base64.b64decode(base64_data)
-                            # Write binary data to stdout
-                            sys.stdout.buffer.write(binary_data)
-                            sys.stdout.buffer.flush()
+
+                            # Check if connected to interactive TTY
+                            if sys.stdout.isatty():
+                                # Extract filename from metadata or use default
+                                metadata = data['data'].get('metadata', {})
+                                if isinstance(metadata, str):
+                                    try:
+                                        metadata = json.loads(metadata)
+                                    except json.JSONDecodeError:
+                                        metadata = {}
+
+                                filename = metadata.get('filename', 'downloaded_file')
+
+                                # Write to file in current working directory
+                                output_path = Path.cwd() / filename
+                                output_path.write_bytes(binary_data)
+                                print(f"File saved to: {output_path}", file=sys.stderr)
+                            else:
+                                # Write binary data to stdout (pipe/redirect mode)
+                                sys.stdout.buffer.write(binary_data)
+                                sys.stdout.buffer.flush()
                         else:
                             print("Error: Invalid file format", file=sys.stderr)
                             return False
