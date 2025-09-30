@@ -371,7 +371,7 @@ jobs:
 
           # Extract release notes from the git tag annotation
           echo "Extracting release notes from git tag: $VERSION"
-          git fetch --tags
+          git fetch --tags --force
           TAG_MESSAGE=$(git tag -l --format='%(contents)' "$VERSION")
 
           # If tag has a message, use it; otherwise use a generic message
