@@ -1,0 +1,57 @@
+#!/bin/bash
+
+# Script to clean up local git tags that don't have corresponding GitHub releases
+
+set -e
+
+echo "Fetching GitHub releases..."
+RELEASES=$(gh release list --limit 1000 --json tagName --jq '.[].tagName')
+
+if [ -z "$RELEASES" ]; then
+    echo "No GitHub releases found or unable to fetch releases."
+    echo "Make sure 'gh' CLI is installed and authenticated."
+    exit 1
+fi
+
+echo "Fetching local git tags..."
+LOCAL_TAGS=$(git tag)
+
+if [ -z "$LOCAL_TAGS" ]; then
+    echo "No local tags found."
+    exit 0
+fi
+
+# Find tags that exist locally but not in GitHub releases
+TAGS_TO_DELETE=()
+while IFS= read -r tag; do
+    if ! echo "$RELEASES" | grep -q "^${tag}$"; then
+        TAGS_TO_DELETE+=("$tag")
+    fi
+done <<< "$LOCAL_TAGS"
+
+if [ ${#TAGS_TO_DELETE[@]} -eq 0 ]; then
+    echo "All local tags have corresponding GitHub releases. Nothing to clean."
+    exit 0
+fi
+
+echo ""
+echo "Found ${#TAGS_TO_DELETE[@]} local tag(s) without GitHub releases:"
+echo ""
+for tag in "${TAGS_TO_DELETE[@]}"; do
+    echo "  - $tag"
+done
+
+echo ""
+read -p "Delete these tags? (y/N): " -n 1 -r
+echo ""
+
+if [[ $REPLY =~ ^[Yy]$ ]]; then
+    for tag in "${TAGS_TO_DELETE[@]}"; do
+        echo "Deleting tag: $tag"
+        git tag -d "$tag"
+    done
+    echo ""
+    echo "Deleted ${#TAGS_TO_DELETE[@]} tag(s)."
+else
+    echo "Cancelled. No tags were deleted."
+fi
