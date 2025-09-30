@@ -87,51 +87,71 @@ def clear_clipboard(user_id):
     conn.close()
 
 def save_clipboard_entry(user_id, content_type, content, metadata=None, client_id=None):
-    """Save a new clipboard entry for a user, maintaining history with FIFO deletion (max 10 entries)"""
+    """Save a new clipboard entry for a user, maintaining history with FIFO deletion (max 10 entries)
+    If the content already exists in history, reorder it to be the most recent instead of creating a duplicate"""
     conn = sqlite3.connect(DATABASE_PATH)
     cursor = conn.cursor()
-    
+
     try:
         # Start transaction for atomic operation
         cursor.execute('BEGIN IMMEDIATE')
-        
+
+        # Check if this exact content already exists for this user
+        cursor.execute('''
+            SELECT id, created_at FROM clipboard_entries
+            WHERE user_id = ? AND content_type = ? AND content = ?
+            ORDER BY created_at DESC
+            LIMIT 1
+        ''', (user_id, content_type, content))
+
+        existing_entry = cursor.fetchone()
+
         # Increment version counter for this user
         cursor.execute('''
             INSERT OR REPLACE INTO user_metadata (user_id, key, value)
             VALUES (?, "clipboard_version", COALESCE((SELECT value FROM user_metadata WHERE user_id = ? AND key = "clipboard_version"), 0) + 1)
         ''', (user_id, user_id))
-        
+
         # Get the new version
         cursor.execute('SELECT value FROM user_metadata WHERE user_id = ? AND key = "clipboard_version"', (user_id,))
         version = cursor.fetchone()[0]
-        
-        # Insert new clipboard entry
-        cursor.execute('''
-            INSERT INTO clipboard_entries (user_id, content_type, content, metadata, created_at, version, client_id)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-        ''', (user_id, content_type, content, metadata, datetime.now().isoformat(), version, client_id))
-        
+
+        if existing_entry:
+            # Update existing entry to make it the most recent
+            entry_id = existing_entry[0]
+            cursor.execute('''
+                UPDATE clipboard_entries
+                SET created_at = ?, version = ?, metadata = ?, client_id = ?
+                WHERE id = ?
+            ''', (datetime.now().isoformat(), version, metadata, client_id, entry_id))
+        else:
+            # Insert new clipboard entry
+            cursor.execute('''
+                INSERT INTO clipboard_entries (user_id, content_type, content, metadata, created_at, version, client_id)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            ''', (user_id, content_type, content, metadata, datetime.now().isoformat(), version, client_id))
+
         # Maintain FIFO history - keep only the 10 most recent entries per user
         cursor.execute('''
-            DELETE FROM clipboard_entries 
-            WHERE user_id = ? 
+            DELETE FROM clipboard_entries
+            WHERE user_id = ?
             AND id NOT IN (
-                SELECT id FROM clipboard_entries 
-                WHERE user_id = ? 
-                ORDER BY created_at DESC 
+                SELECT id FROM clipboard_entries
+                WHERE user_id = ?
+                ORDER BY created_at DESC
                 LIMIT 10
             )
         ''', (user_id, user_id))
-        
+
         # Commit transaction
         conn.commit()
-        
+
     except Exception as e:
         conn.rollback()
         raise e
     finally:
         conn.close()
-    
+
     # Notify waiting clients
     with _clipboard_changed_condition:
         _clipboard_changed_condition.notify_all()
