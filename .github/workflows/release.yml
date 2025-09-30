@@ -367,98 +367,34 @@ jobs:
       - name: Generate release notes
         id: release_notes
         run: |
-          cat > release_notes.md << 'EOF'
+          VERSION="${{ steps.version.outputs.VERSION }}"
+
+          # Extract release notes from the git tag annotation
+          echo "Extracting release notes from git tag: $VERSION"
+          git fetch --tags
+          TAG_MESSAGE=$(git tag -l --format='%(contents)' "$VERSION")
+
+          # If tag has a message, use it; otherwise use a generic message
+          if [ -n "$TAG_MESSAGE" ]; then
+            echo "Using release notes from git tag annotation"
+            echo "$TAG_MESSAGE" > release_notes.md
+          else
+            echo "No tag annotation found, using generic release notes"
+            cat > release_notes.md << 'EOF'
           # CopyPasta ${{ steps.version.outputs.VERSION }}
-          
-          ## What's New
-          
+
           Cross-device clipboard sharing application built with Flask.
-          
+
           ## Downloads
-          
-          ### Windows
+
           - **CopyPastaInstaller-v${{ steps.version.outputs.NUMERIC_VERSION }}.msi** - Windows MSI installer
-          
-          ### macOS
           - **CopyPasta-${{ steps.version.outputs.NUMERIC_VERSION }}-intel.dmg** - macOS application (Intel Macs)
-          
-          ### Linux CLI
           - **copyp_${{ steps.version.outputs.NUMERIC_VERSION }}-1_all.deb** - Debian package for Linux CLI tool
-          
-          ### Docker
           - **copypasta-docker-${{ steps.version.outputs.VERSION }}.tar.gz** - Docker image
-          
-          ## Features
-          
-          - 🌐 **Web Interface**: Access clipboard from any device with a web browser
-          - 🪟 **Windows Client App**: Native Windows application with system tray integration
-          - 🍎 **macOS Status Bar App**: Native macOS application with system integration
-          - 🖥️ **Linux CLI Tool**: Command-line interface for seamless clipboard sharing
-          - 📝 **Text Support**: Share text content across devices
-          - 🖼️ **Image Support**: Copy and paste images across devices
-          - 🔒 **Authentication**: Secure login system
-          - 🐳 **Docker Deployment**: Easy server setup with Docker
-          - 💾 **SQLite Database**: Persistent clipboard storage
-          
-          ## Installation
-          
-          ### Windows Client Application
-          1. Download `CopyPastaInstaller-v${{ steps.version.outputs.NUMERIC_VERSION }}.msi`
-          2. Run the MSI installer
-          3. The application will start automatically and run in the system tray
-          4. Configure your server URL in the settings
-          
-          ### macOS Application
-          1. Download `CopyPasta-${{ steps.version.outputs.NUMERIC_VERSION }}-intel.dmg`
-          2. Open the DMG file
-          3. Drag CopyPasta.app to the Applications folder
-          4. Launch CopyPasta from Applications
-          5. Configure your server settings via the status bar menu
-          
-          ### Linux CLI Tool
-          ```bash
-          # Install the Debian package
-          sudo dpkg -i copyp_${{ steps.version.outputs.NUMERIC_VERSION }}-1_all.deb
-          sudo apt-get install -f  # Install dependencies if needed
-          
-          # First run - configure your server
-          copyp
-          
-          # Copy text to clipboard
-          echo "Hello World" | copyp
-          
-          # Paste from clipboard
-          copyp
-          ```
-          
-          ### Server (Docker)
-          
-          **Option 1: Using Docker Hub (Recommended)**
-          ```bash
-          # Pull and run from Docker Hub
-          docker run -d -p 5000:5000 --name copypasta nerwander/copypasta:${{ steps.version.outputs.VERSION }}
-          
-          # Or use docker-compose
-          docker compose up -d
-          ```
-          
-          **Option 2: Using Downloaded Image**
-          ```bash
-          # Load the Docker image
-          gunzip -c copypasta-docker-${{ steps.version.outputs.VERSION }}.tar.gz | docker load
-          
-          # Run the container
-          docker run -d -p 5000:5000 --name copypasta nerwander/copypasta:${{ steps.version.outputs.VERSION }}
-          ```
-          
-          ## System Requirements
-          
-          - **Server**: Docker or Python 3.11+
-          - **Windows App**: Windows 10 or later, .NET Framework 4.8+
-          - **macOS App**: macOS 11.0 (Big Sur) or later, Intel Mac
-          - **Linux CLI**: Python 3.8+ (included with most Linux distributions)
-          
+
+          See the [README](https://github.com/nerwander/copypasta) for installation instructions.
           EOF
+          fi
 
       - name: Create GitHub Release
         env:
