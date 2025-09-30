@@ -225,15 +225,16 @@ extension AppDelegate: SettingsWindowControllerDelegate {
 
 // MARK: - ClipboardMonitor Delegate
 extension AppDelegate: ClipboardMonitorDelegate {
-    func clipboardDidChange(content: String, type: ClipboardContentType) {
-        Logger.log("AppDelegate", "Clipboard changed: \(type), length: \(content.count)")
-        
+    func clipboardDidChange(content: String, type: ClipboardContentType, filename: String?) {
+        Logger.log("AppDelegate", "Clipboard changed: \(type), length: \(content.count), filename: \(filename ?? "none")")
+
         if Settings.shared.isConfigured {
             Task {
                 do {
-                    try await copyPastaClient.uploadClipboardContent(content: content, type: type)
+                    try await copyPastaClient.uploadClipboardContent(content: content, type: type, filename: filename)
                     if Settings.shared.showNotifications {
-                        statusBarController.showNotification(title: "CopyPasta", message: "Content uploaded successfully")
+                        let typeLabel = type == .file ? "File" : "Content"
+                        statusBarController.showNotification(title: "CopyPasta", message: "\(typeLabel) uploaded successfully")
                     }
                 } catch {
                     Logger.logError("AppDelegate", "Failed to upload clipboard content", error)
@@ -248,13 +249,14 @@ extension AppDelegate: ClipboardMonitorDelegate {
 
 // MARK: - CopyPastaClient Delegate
 extension AppDelegate: CopyPastaClientDelegate {
-    func clipboardChangedOnServer(content: String, type: ClipboardContentType) {
-        Logger.log("AppDelegate", "Server clipboard changed: \(type), length: \(content.count)")
-        
+    func clipboardChangedOnServer(content: String, type: ClipboardContentType, filename: String?) {
+        Logger.log("AppDelegate", "Server clipboard changed: \(type), length: \(content.count), filename: \(filename ?? "none")")
+
         DispatchQueue.main.async {
-            self.clipboardMonitor.setClipboardContent(content: content, type: type)
+            self.clipboardMonitor.setClipboardContent(content: content, type: type, filename: filename)
             if Settings.shared.showNotifications {
-                self.statusBarController.showNotification(title: "CopyPasta", message: "Clipboard updated from server")
+                let typeLabel = type == .file ? "File" : "Clipboard"
+                self.statusBarController.showNotification(title: "CopyPasta", message: "\(typeLabel) updated from server")
             }
         }
     }

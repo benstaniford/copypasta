@@ -56,12 +56,12 @@ namespace CopyPasta
             }
         }
 
-        public async Task UploadClipboardContent(string content, ClipboardContentType contentType)
+        public async Task UploadClipboardContent(string content, ClipboardContentType contentType, string filename = "")
         {
             if (!_settings.IsConfigured)
                 throw new InvalidOperationException("CopyPasta client is not configured.");
 
-            Logger.LogNetwork("Upload", "UploadClipboardContent", "Starting", $"Type: {contentType}, Size: {content?.Length ?? 0} bytes");
+            Logger.LogNetwork("Upload", "UploadClipboardContent", "Starting", $"Type: {contentType}, Size: {content?.Length ?? 0} bytes, Filename: {filename}");
 
             await EnsureAuthenticated();
 
@@ -70,6 +70,7 @@ namespace CopyPasta
                 ClipboardContentType.Text => "text",
                 ClipboardContentType.RichText => "rich",
                 ClipboardContentType.Image => "image",
+                ClipboardContentType.File => "file",
                 _ => "text"
             };
 
@@ -77,7 +78,8 @@ namespace CopyPasta
             {
                 type = apiContentType,
                 content = content,
-                client_id = _clientId
+                client_id = _clientId,
+                filename = string.IsNullOrEmpty(filename) ? (object?)null : filename
             };
 
             var json = JsonConvert.SerializeObject(payload);
@@ -272,19 +274,21 @@ namespace CopyPasta
                         if (result?.Status == "success" && result.Data != null)
                         {
                             Logger.LogNetwork("LongPoll", url, "NewData", $"Version: {result.Version}, Type: {result.Data.ContentType}");
-                            
+
                             var contentType = result.Data.ContentType switch
                             {
                                 "text" => ClipboardContentType.Text,
                                 "rich" => ClipboardContentType.RichText,
                                 "image" => ClipboardContentType.Image,
+                                "file" => ClipboardContentType.File,
                                 _ => ClipboardContentType.Text
                             };
 
                             ClipboardChangedOnServer?.Invoke(this, new ClipboardChangedEventArgs
                             {
                                 Content = result.Data.Content,
-                                ContentType = contentType
+                                ContentType = contentType,
+                                Filename = result.Data.Filename ?? ""
                             });
                         }
                         else if (result?.Status == "timeout")
@@ -367,5 +371,8 @@ namespace CopyPasta
 
         [JsonProperty("version")]
         public int Version { get; set; }
+
+        [JsonProperty("filename")]
+        public string? Filename { get; set; }
     }
 }

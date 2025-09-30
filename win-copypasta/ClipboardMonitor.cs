@@ -3,6 +3,7 @@ using System.Drawing;
 using System.Drawing.Imaging;
 using System.IO;
 using System.Runtime.InteropServices;
+using System.Threading.Tasks;
 using System.Windows.Forms;
 using System.Web;
 
@@ -12,20 +13,23 @@ namespace CopyPasta
     {
         Text,
         RichText,
-        Image
+        Image,
+        File
     }
 
     public class ClipboardChangedEventArgs : EventArgs
     {
         public string Content { get; set; } = "";
         public ClipboardContentType ContentType { get; set; }
+        public string Filename { get; set; } = "";
 
         public ClipboardChangedEventArgs() { }
 
-        public ClipboardChangedEventArgs(string content, ClipboardContentType contentType)
+        public ClipboardChangedEventArgs(string content, ClipboardContentType contentType, string filename = "")
         {
             Content = content;
             ContentType = contentType;
+            Filename = filename;
         }
     }
 
@@ -100,7 +104,49 @@ namespace CopyPasta
             
             try
             {
-                if (Clipboard.ContainsData(DataFormats.Bitmap) || Clipboard.ContainsImage())
+                if (Clipboard.ContainsFileDropList())
+                {
+                    // Handle file content
+                    Logger.Log("ClipboardMonitor", "Processing file content");
+                    var files = Clipboard.GetFileDropList();
+                    if (files != null && files.Count > 0)
+                    {
+                        var filePath = files[0]; // Only handle first file for now
+                        Logger.Log("ClipboardMonitor", $"File detected: {filePath}");
+
+                        // Process file asynchronously to avoid locking
+                        _ = Task.Run(() =>
+                        {
+                            try
+                            {
+                                var fileInfo = new FileInfo(filePath!);
+                                var tempFilePath = Path.Combine(Path.GetTempPath(), fileInfo.Name);
+
+                                // Copy to temp folder first
+                                Logger.Log("ClipboardMonitor", $"Copying file to temp: {tempFilePath}");
+                                File.Copy(filePath!, tempFilePath, true);
+
+                                // Convert to base64
+                                var base64Content = ConvertFileToBase64(tempFilePath);
+
+                                if (!string.IsNullOrEmpty(base64Content) && base64Content != _lastClipboardContent)
+                                {
+                                    _lastClipboardContent = base64Content;
+                                    Logger.Log("ClipboardMonitor", $"File content changed, filename: {fileInfo.Name}, size: {base64Content.Length} chars");
+                                    ClipboardChanged?.Invoke(this, new ClipboardChangedEventArgs(base64Content, ClipboardContentType.File, fileInfo.Name));
+                                }
+
+                                // Clean up temp file after upload
+                                try { File.Delete(tempFilePath); } catch { }
+                            }
+                            catch (Exception ex)
+                            {
+                                Logger.LogError("ClipboardMonitor", "Error processing file", ex);
+                            }
+                        });
+                    }
+                }
+                else if (Clipboard.ContainsData(DataFormats.Bitmap) || Clipboard.ContainsImage())
                 {
                     // Handle image content
                     Logger.Log("ClipboardMonitor", "Processing image content");
@@ -189,6 +235,20 @@ namespace CopyPasta
             catch (Exception ex)
             {
                 Logger.LogError("ClipboardMonitor", "Error converting image to base64", ex);
+                return "";
+            }
+        }
+
+        private string ConvertFileToBase64(string filePath)
+        {
+            try
+            {
+                var fileBytes = File.ReadAllBytes(filePath);
+                return "data:application/octet-stream;base64," + Convert.ToBase64String(fileBytes);
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError("ClipboardMonitor", "Error converting file to base64", ex);
                 return "";
             }
         }

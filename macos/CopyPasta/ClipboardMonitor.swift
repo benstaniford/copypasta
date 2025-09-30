@@ -5,10 +5,11 @@ enum ClipboardContentType {
     case text
     case richText
     case image
+    case file
 }
 
 protocol ClipboardMonitorDelegate: AnyObject {
-    func clipboardDidChange(content: String, type: ClipboardContentType)
+    func clipboardDidChange(content: String, type: ClipboardContentType, filename: String?)
 }
 
 class ClipboardMonitor {
@@ -73,49 +74,65 @@ class ClipboardMonitor {
             Logger.log("ClipboardMonitor", "No supported content found in clipboard")
             return
         }
-        
+
         Logger.log("ClipboardMonitor", "Clipboard changed: \(content.type), length: \(content.content.count)")
-        delegate?.clipboardDidChange(content: content.content, type: content.type)
+        delegate?.clipboardDidChange(content: content.content, type: content.type, filename: content.filename)
     }
     
-    private func getClipboardContent() -> (content: String, type: ClipboardContentType)? {
-        // Check for images first
+    private func getClipboardContent() -> (content: String, type: ClipboardContentType, filename: String?)? {
+        // Check for files first
+        if let fileURLs = pasteboard.readObjects(forClasses: [NSURL.self], options: nil) as? [URL], !fileURLs.isEmpty {
+            let fileURL = fileURLs[0] // Only handle first file
+            Logger.log("ClipboardMonitor", "File detected: \(fileURL.path)")
+
+            do {
+                let fileData = try Data(contentsOf: fileURL)
+                let base64String = fileData.base64EncodedString()
+                let filename = fileURL.lastPathComponent
+                Logger.log("ClipboardMonitor", "Detected file content: \(filename), size: \(fileData.count) bytes")
+                return (content: "data:application/octet-stream;base64,\(base64String)", type: .file, filename: filename)
+            } catch {
+                Logger.logError("ClipboardMonitor", "Error reading file", error)
+            }
+        }
+
+        // Check for images
         if let imageData = pasteboard.data(forType: .tiff),
            let image = NSImage(data: imageData),
            let pngData = image.pngData {
             let base64String = pngData.base64EncodedString()
             Logger.log("ClipboardMonitor", "Detected image content")
-            return (content: "data:image/png;base64,\(base64String)", type: .image)
+            return (content: "data:image/png;base64,\(base64String)", type: .image, filename: nil)
         }
-        
+
         // Get plain text for comparison
         let plainText = pasteboard.string(forType: .string) ?? ""
-        
+
         // Check for rich text (RTF)
         if let rtfData = pasteboard.data(forType: .rtf) {
             if let attributedString = NSAttributedString(rtf: rtfData, documentAttributes: nil) {
                 // Check if this is terminal styling vs actual rich content
                 if isTerminalStyling(attributedString: attributedString, plainText: plainText) {
                     Logger.log("ClipboardMonitor", "Detected terminal styling - treating as plain text")
-                    return (content: plainText, type: .text)
+                    return (content: plainText, type: .text, filename: nil)
                 }
-                
+
                 // Convert to HTML for rich text
                 if let htmlData = try? attributedString.data(from: NSRange(location: 0, length: attributedString.length),
                                                             documentAttributes: [.documentType: NSAttributedString.DocumentType.html]) {
                     let htmlString = String(data: htmlData, encoding: .utf8) ?? attributedString.string
                     Logger.log("ClipboardMonitor", "Detected rich text content")
-                    return (content: htmlString, type: .richText)
+                    return (content: htmlString, type: .richText, filename: nil)
                 }
             }
         }
-        
+
         // Check for plain text
         if !plainText.isEmpty {
             Logger.log("ClipboardMonitor", "Detected plain text content")
-            return (content: plainText, type: .text)
+            return (content: plainText, type: .text, filename: nil)
         }
-        
+
         return nil
     }
     
@@ -188,18 +205,18 @@ class ClipboardMonitor {
         return false
     }
     
-    func setClipboardContent(content: String, type: ClipboardContentType) {
+    func setClipboardContent(content: String, type: ClipboardContentType, filename: String? = nil) {
         Logger.log("ClipboardMonitor", "Setting clipboard content: \(type), length: \(content.count)")
-        
+
         isUpdatingFromServer = true
         defer { isUpdatingFromServer = false }
-        
+
         pasteboard.clearContents()
-        
+
         switch type {
         case .text:
             pasteboard.setString(content, forType: .string)
-            
+
         case .richText:
             // Try to parse HTML and convert to RTF
             if let htmlData = content.data(using: .utf8),
@@ -219,7 +236,7 @@ class ClipboardMonitor {
                 // Fallback to plain text
                 pasteboard.setString(content, forType: .string)
             }
-            
+
         case .image:
             // Parse base64 image data
             if content.hasPrefix("data:image/") {
@@ -233,8 +250,30 @@ class ClipboardMonitor {
                      let image = NSImage(data: imageData) {
                 pasteboard.setData(image.tiffRepresentation, forType: .tiff)
             }
+
+        case .file:
+            // Parse base64 file data and save to temp location
+            if content.hasPrefix("data:application/octet-stream;base64,") {
+                let components = content.components(separatedBy: ",")
+                if components.count == 2,
+                   let fileData = Data(base64Encoded: components[1]) {
+                    // Save to Downloads folder with original filename
+                    let downloadsURL = FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask).first!
+                    let fileName = filename ?? "downloaded_file"
+                    let fileURL = downloadsURL.appendingPathComponent(fileName)
+
+                    do {
+                        try fileData.write(to: fileURL)
+                        Logger.log("ClipboardMonitor", "File saved to: \(fileURL.path)")
+                        // Set the file URL in the clipboard
+                        pasteboard.writeObjects([fileURL as NSURL])
+                    } catch {
+                        Logger.logError("ClipboardMonitor", "Error saving file", error)
+                    }
+                }
+            }
         }
-        
+
         lastChangeCount = pasteboard.changeCount
     }
 }

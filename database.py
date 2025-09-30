@@ -38,6 +38,7 @@ def init_db():
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             version INTEGER DEFAULT 1,
             client_id TEXT,
+            filename TEXT,
             FOREIGN KEY (user_id) REFERENCES users (id)
         )
     ''')
@@ -58,15 +59,20 @@ def init_db():
         cursor.execute('ALTER TABLE clipboard_entries ADD COLUMN user_id INTEGER')
     except sqlite3.OperationalError:
         pass  # Column already exists
-    
+
     # Migration: Add new columns if they don't exist
     try:
         cursor.execute('ALTER TABLE clipboard_entries ADD COLUMN version INTEGER DEFAULT 1')
     except sqlite3.OperationalError:
         pass  # Column already exists
-    
+
     try:
         cursor.execute('ALTER TABLE clipboard_entries ADD COLUMN client_id TEXT')
+    except sqlite3.OperationalError:
+        pass  # Column already exists
+
+    try:
+        cursor.execute('ALTER TABLE clipboard_entries ADD COLUMN filename TEXT')
     except sqlite3.OperationalError:
         pass  # Column already exists
     
@@ -86,7 +92,7 @@ def clear_clipboard(user_id):
     conn.commit()
     conn.close()
 
-def save_clipboard_entry(user_id, content_type, content, metadata=None, client_id=None):
+def save_clipboard_entry(user_id, content_type, content, metadata=None, client_id=None, filename=None):
     """Save a new clipboard entry for a user, maintaining history with FIFO deletion (max 10 entries)
     If the content already exists in history, reorder it to be the most recent instead of creating a duplicate"""
     conn = sqlite3.connect(DATABASE_PATH)
@@ -121,15 +127,15 @@ def save_clipboard_entry(user_id, content_type, content, metadata=None, client_i
             entry_id = existing_entry[0]
             cursor.execute('''
                 UPDATE clipboard_entries
-                SET created_at = ?, version = ?, metadata = ?, client_id = ?
+                SET created_at = ?, version = ?, metadata = ?, client_id = ?, filename = ?
                 WHERE id = ?
-            ''', (datetime.now().isoformat(), version, metadata, client_id, entry_id))
+            ''', (datetime.now().isoformat(), version, metadata, client_id, filename, entry_id))
         else:
             # Insert new clipboard entry
             cursor.execute('''
-                INSERT INTO clipboard_entries (user_id, content_type, content, metadata, created_at, version, client_id)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
-            ''', (user_id, content_type, content, metadata, datetime.now().isoformat(), version, client_id))
+                INSERT INTO clipboard_entries (user_id, content_type, content, metadata, created_at, version, client_id, filename)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (user_id, content_type, content, metadata, datetime.now().isoformat(), version, client_id, filename))
 
         # Maintain FIFO history - keep only the 10 most recent entries per user
         cursor.execute('''
@@ -160,18 +166,18 @@ def get_clipboard_entry(user_id):
     """Get the current clipboard entry for a user"""
     conn = sqlite3.connect(DATABASE_PATH)
     cursor = conn.cursor()
-    
+
     cursor.execute('''
-        SELECT content_type, content, metadata, created_at, version, client_id
+        SELECT content_type, content, metadata, created_at, version, client_id, filename
         FROM clipboard_entries
         WHERE user_id = ?
         ORDER BY created_at DESC
         LIMIT 1
     ''', (user_id,))
-    
+
     result = cursor.fetchone()
     conn.close()
-    
+
     if result:
         return {
             'content_type': result[0],
@@ -179,7 +185,8 @@ def get_clipboard_entry(user_id):
             'metadata': result[2],
             'created_at': result[3],
             'version': result[4],
-            'client_id': result[5]
+            'client_id': result[5],
+            'filename': result[6]
         }
     return None
 
@@ -187,18 +194,18 @@ def get_clipboard_history(user_id, limit=10):
     """Get clipboard history for a user (excluding the current/most recent entry)"""
     conn = sqlite3.connect(DATABASE_PATH)
     cursor = conn.cursor()
-    
+
     cursor.execute('''
-        SELECT id, content_type, content, metadata, created_at, version, client_id
+        SELECT id, content_type, content, metadata, created_at, version, client_id, filename
         FROM clipboard_entries
         WHERE user_id = ?
         ORDER BY created_at DESC
         LIMIT ? OFFSET 1
     ''', (user_id, limit))
-    
+
     results = cursor.fetchall()
     conn.close()
-    
+
     history = []
     for result in results:
         history.append({
@@ -208,9 +215,10 @@ def get_clipboard_history(user_id, limit=10):
             'metadata': result[3],
             'created_at': result[4],
             'version': result[5],
-            'client_id': result[6]
+            'client_id': result[6],
+            'filename': result[7]
         })
-    
+
     return history
 
 def get_clipboard_version(user_id):

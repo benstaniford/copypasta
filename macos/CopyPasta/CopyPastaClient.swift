@@ -1,7 +1,7 @@
 import Foundation
 
 protocol CopyPastaClientDelegate: AnyObject {
-    func clipboardChangedOnServer(content: String, type: ClipboardContentType)
+    func clipboardChangedOnServer(content: String, type: ClipboardContentType, filename: String?)
 }
 
 class CopyPastaClient {
@@ -87,15 +87,15 @@ class CopyPastaClient {
         }
     }
     
-    func uploadClipboardContent(content: String, type: ClipboardContentType) async throws {
+    func uploadClipboardContent(content: String, type: ClipboardContentType, filename: String? = nil) async throws {
         guard let settings = settings, settings.isConfigured else {
             throw CopyPastaError.notConfigured
         }
-        
+
         Logger.logNetwork("Upload", "UploadClipboardContent", "Starting", "Type: \(type), Size: \(content.count) bytes")
-        
+
         try await ensureAuthenticated()
-        
+
         let apiContentType: String
         switch type {
         case .text:
@@ -104,30 +104,36 @@ class CopyPastaClient {
             apiContentType = "rich"
         case .image:
             apiContentType = "image"
+        case .file:
+            apiContentType = "file"
         }
-        
-        let payload: [String: Any] = [
+
+        var payload: [String: Any] = [
             "type": apiContentType,
             "content": content,
             "client_id": clientId
         ]
-        
+
+        if let filename = filename {
+            payload["filename"] = filename
+        }
+
         Logger.log("CopyPastaClient", "Uploading with client_id: \(clientId)")
-        
+
         let jsonData = try JSONSerialization.data(withJSONObject: payload)
-        
+
         let url = URL(string: "\(settings.serverEndpoint)/api/paste")!
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.httpBody = jsonData
-        
+
         if let sessionCookie = sessionCookie {
             request.setValue(sessionCookie, forHTTPHeaderField: "Cookie")
         }
-        
+
         let (_, response) = try await urlSession.data(for: request)
-        
+
         if let httpResponse = response as? HTTPURLResponse {
             if httpResponse.statusCode == 200 {
                 Logger.logNetwork("Upload", url.absoluteString, "Success", "Content uploaded successfully")
@@ -216,13 +222,13 @@ class CopyPastaClient {
                         if pollResponse.status == "success", let clipboardData = pollResponse.data {
                             let dataClientId = clipboardData.clientId ?? "unknown"
                             Logger.logNetwork("LongPoll", url.absoluteString, "NewData", "Version: \(pollResponse.version), Type: \(clipboardData.contentType), ClientID: \(dataClientId)")
-                            
+
                             // Double-check client ID filtering on client side as backup
                             if let clipboardClientId = clipboardData.clientId, clipboardClientId == clientId {
                                 Logger.log("CopyPastaClient", "Ignoring clipboard change from same client: \(clipboardClientId)")
                             } else {
                                 Logger.log("CopyPastaClient", "Processing clipboard change from different client: \(dataClientId) (our ID: \(clientId))")
-                                
+
                                 let contentType: ClipboardContentType
                                 switch clipboardData.contentType {
                                 case "text":
@@ -231,11 +237,13 @@ class CopyPastaClient {
                                     contentType = .richText
                                 case "image":
                                     contentType = .image
+                                case "file":
+                                    contentType = .file
                                 default:
                                     contentType = .text
                                 }
-                                
-                                delegate?.clipboardChangedOnServer(content: clipboardData.content, type: contentType)
+
+                                delegate?.clipboardChangedOnServer(content: clipboardData.content, type: contentType, filename: clipboardData.filename)
                             }
                         } else if pollResponse.status == "timeout" {
                             Logger.logNetwork("LongPoll", url.absoluteString, "Timeout", "Version: \(pollResponse.version)")
@@ -276,7 +284,8 @@ struct ClipboardData: Codable {
     let createdAt: String
     let version: Int
     let clientId: String?
-    
+    let filename: String?
+
     enum CodingKeys: String, CodingKey {
         case contentType = "content_type"
         case content
@@ -284,6 +293,7 @@ struct ClipboardData: Codable {
         case createdAt = "created_at"
         case version
         case clientId = "client_id"
+        case filename
     }
 }
 

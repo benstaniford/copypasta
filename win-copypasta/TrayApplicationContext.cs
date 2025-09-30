@@ -137,13 +137,13 @@ namespace CopyPasta
 
         private async void OnClipboardChanged(object? sender, ClipboardChangedEventArgs e)
         {
-            Logger.Log("TrayApp", $"Clipboard changed: {e.ContentType} content, length: {e.Content?.Length ?? 0}");
-            
+            Logger.Log("TrayApp", $"Clipboard changed: {e.ContentType} content, length: {e.Content?.Length ?? 0}, filename: {e.Filename}");
+
             if (_settings.IsConfigured)
             {
                 try
                 {
-                                                await _client.UploadClipboardContent(e.Content ?? string.Empty, e.ContentType);
+                    await _client.UploadClipboardContent(e.Content ?? string.Empty, e.ContentType, e.Filename);
                     UpdateTrayIcon("Upload successful", ToolTipIcon.Info);
                     Logger.Log("TrayApp", "Clipboard content uploaded successfully");
                 }

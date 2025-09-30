@@ -501,8 +501,8 @@
                     
                     <div class="button-group">
                         <div class="file-input-wrapper">
-                            <label for="imageInput" class="file-input-label">📷 Upload Image</label>
-                            <input type="file" id="imageInput" class="file-input" accept="image/*">
+                            <label for="fileInput" class="file-input-label">📎 Upload File</label>
+                            <input type="file" id="fileInput" class="file-input">
                         </div>
                         <button onclick="pasteContent()">💾 Store</button>
                     </div>
@@ -516,8 +516,8 @@
                         <em>No content in clipboard</em>
                     </div>
                     
-                    <div class="button-group">
-                        <button class="btn-copy" onclick="copyContent()">📋 Copy</button>
+                    <div class="button-group" id="clipboardActions">
+                        <button class="btn-copy" id="actionBtn" onclick="copyContent()">📋 Copy</button>
                         <button class="btn-refresh" onclick="refreshClipboard()">🔄 Refresh</button>
                     </div>
                     
@@ -635,19 +635,20 @@ Your username: ${document.querySelector('.logout-btn') ? 'Logged in' : 'Not logg
         // Load clipboard content on page load
         document.addEventListener('DOMContentLoaded', function() {
             refreshClipboard();
-            
-            // Handle image file selection
-            document.getElementById('imageInput').addEventListener('change', function(e) {
+
+            // Handle file selection
+            document.getElementById('fileInput').addEventListener('change', function(e) {
                 const file = e.target.files[0];
-                if (file && file.type.startsWith('image/')) {
+                if (file) {
                     const reader = new FileReader();
                     reader.onload = function(e) {
-                        pasteContent('image', e.target.result);
+                        const contentType = file.type.startsWith('image/') ? 'image' : 'file';
+                        pasteContent(contentType, e.target.result, file.name);
                     };
                     reader.readAsDataURL(file);
                 }
             });
-            
+
             // Handle paste events for automatic content detection
             document.getElementById('pasteArea').addEventListener('paste', handleSmartPaste);
         });
@@ -727,18 +728,18 @@ Your username: ${document.querySelector('.logout-btn') ? 'Logged in' : 'Not logg
             }, 3000);
         }
 
-        async function pasteContent(type = null, content = null) {
+        async function pasteContent(type = null, content = null, filename = null) {
             try {
                 let contentType = type || detectContentType();
                 let contentData = content;
-                
+
                 if (!contentData) {
                     const pasteArea = document.getElementById('pasteArea');
                     if (pasteArea.innerHTML.trim() === '' || pasteArea.innerHTML === '<br>') {
                         showStatus('pasteStatus', 'Please enter some content to paste', true);
                         return;
                     }
-                    
+
                     // Automatically detect content type and extract data
                     if (pasteArea.querySelector('img') || pasteArea.innerHTML !== pasteArea.textContent) {
                         contentType = 'rich';
@@ -751,25 +752,32 @@ Your username: ${document.querySelector('.logout-btn') ? 'Logged in' : 'Not logg
                     }
                 }
 
+                const requestBody = {
+                    type: contentType,
+                    content: contentData
+                };
+
+                if (filename) {
+                    requestBody.filename = filename;
+                }
+
                 const response = await fetch('/api/paste', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify({
-                        type: contentType,
-                        content: contentData
-                    })
+                    body: JSON.stringify(requestBody)
                 });
 
                 const result = await response.json();
-                
+
                 if (response.ok) {
-                    showStatus('pasteStatus', `${contentType === 'rich' ? 'Rich content' : contentType === 'image' ? 'Image' : 'Text'} saved to clipboard!`);
+                    const typeLabel = contentType === 'rich' ? 'Rich content' : contentType === 'image' ? 'Image' : contentType === 'file' ? 'File' : 'Text';
+                    showStatus('pasteStatus', `${typeLabel} saved to clipboard!`);
                     if (contentType === 'text' || contentType === 'rich') {
                         document.getElementById('pasteArea').innerHTML = '';
                     } else {
-                        document.getElementById('imageInput').value = '';
+                        document.getElementById('fileInput').value = '';
                     }
                     await refreshClipboard();
                 } else {
@@ -808,21 +816,37 @@ Your username: ${document.querySelector('.logout-btn') ? 'Logged in' : 'Not logg
 
         function displayClipboard(data) {
             const container = document.getElementById('previewContainer');
-            
-            if (data.content_type === 'image') {
+            const actionBtn = document.getElementById('actionBtn');
+
+            if (data.content_type === 'file') {
+                // Display filename for file types
+                container.innerHTML = `<div class="preview-text">📎 File: <strong>${data.filename || 'Unknown file'}</strong></div>`;
+                actionBtn.textContent = '⬇️ Download';
+                actionBtn.onclick = downloadFile;
+                actionBtn.className = 'btn-copy';
+            } else if (data.content_type === 'image') {
                 container.innerHTML = `<img src="${data.content}" class="preview-image" alt="Clipboard Image">`;
+                actionBtn.textContent = '📋 Copy';
+                actionBtn.onclick = copyContent;
+                actionBtn.className = 'btn-copy';
             } else if (data.content_type === 'rich') {
                 const div = document.createElement('div');
                 div.className = 'preview-rich';
                 div.innerHTML = data.content;
                 container.innerHTML = '';
                 container.appendChild(div);
+                actionBtn.textContent = '📋 Copy';
+                actionBtn.onclick = copyContent;
+                actionBtn.className = 'btn-copy';
             } else {
                 const div = document.createElement('div');
                 div.className = 'preview-text';
                 div.textContent = data.content;
                 container.innerHTML = '';
                 container.appendChild(div);
+                actionBtn.textContent = '📋 Copy';
+                actionBtn.onclick = copyContent;
+                actionBtn.className = 'btn-copy';
             }
         }
 
@@ -830,6 +854,20 @@ Your username: ${document.querySelector('.logout-btn') ? 'Logged in' : 'Not logg
             const element = document.getElementById('lastUpdated');
             const date = new Date(timestamp);
             element.textContent = 'Last updated: ' + date.toLocaleString();
+        }
+
+        async function downloadFile() {
+            if (!currentClipboard || currentClipboard.content_type !== 'file') {
+                showStatus('copyStatus', 'No file to download', true);
+                return;
+            }
+
+            try {
+                window.location.href = '/api/download/file';
+                showStatus('copyStatus', 'Downloading file...');
+            } catch (error) {
+                showStatus('copyStatus', 'Failed to download: ' + error.message, true);
+            }
         }
 
         async function copyContent() {
@@ -957,10 +995,12 @@ Your username: ${document.querySelector('.logout-btn') ? 'Logged in' : 'Not logg
         function createHistoryItem(item, index) {
             const date = new Date(item.created_at);
             const formattedDate = date.toLocaleString();
-            
+
             // Create preview text based on content type
             let previewText = '';
-            if (item.content_type === 'image') {
+            if (item.content_type === 'file') {
+                previewText = `File: ${item.filename || 'Unknown file'}`;
+            } else if (item.content_type === 'image') {
                 previewText = 'Image content';
             } else if (item.content_type === 'rich') {
                 const tempDiv = document.createElement('div');
@@ -970,6 +1010,11 @@ Your username: ${document.querySelector('.logout-btn') ? 'Logged in' : 'Not logg
                 previewText = item.content.substring(0, 50) + (item.content.length > 50 ? '...' : '');
             }
             
+            // Determine button text and onclick handler based on content type
+            const isFile = item.content_type === 'file';
+            const buttonText = isFile ? '⬇️ Download' : '📋 Copy This Item';
+            const buttonHandler = isFile ? `downloadHistoryItem(${index}, event)` : `copyHistoryItem(${index}, event)`;
+
             const itemDiv = document.createElement('div');
             itemDiv.className = 'history-item';
             itemDiv.innerHTML = `
@@ -983,13 +1028,13 @@ Your username: ${document.querySelector('.logout-btn') ? 'Logged in' : 'Not logg
                 </div>
                 <div class="history-item-content">
                     <div class="history-preview" id="historyPreview${index}"></div>
-                    <button class="history-copy-btn" onclick="copyHistoryItem(${index}, event)">📋 Copy This Item</button>
+                    <button class="history-copy-btn" onclick="${buttonHandler}">${buttonText}</button>
                 </div>
             `;
-            
+
             // Store the item data for later use
             itemDiv.dataset.itemData = JSON.stringify(item);
-            
+
             return itemDiv;
         }
 
@@ -1011,7 +1056,9 @@ Your username: ${document.querySelector('.logout-btn') ? 'Logged in' : 'Not logg
         }
 
         function displayHistoryPreview(container, data) {
-            if (data.content_type === 'image') {
+            if (data.content_type === 'file') {
+                container.innerHTML = `<div class="history-preview-text">📎 File: <strong>${data.filename || 'Unknown file'}</strong></div>`;
+            } else if (data.content_type === 'image') {
                 container.innerHTML = `<img src="${data.content}" class="preview-image" alt="Historical Clipboard Image">`;
             } else if (data.content_type === 'rich') {
                 const div = document.createElement('div');
@@ -1116,6 +1163,46 @@ Your username: ${document.querySelector('.logout-btn') ? 'Logged in' : 'Not logg
             } catch (error) {
                 console.error('Copy error:', error);
                 showHistoryItemStatus(button, 'Copy failed', true);
+            }
+        }
+
+        async function downloadHistoryItem(index, event) {
+            event.stopPropagation(); // Prevent toggling the item
+
+            const historyItems = document.querySelectorAll('.history-item');
+            const item = historyItems[index];
+            const itemData = JSON.parse(item.dataset.itemData);
+            const button = event.target;
+
+            if (itemData.content_type !== 'file') {
+                showHistoryItemStatus(button, 'Not a file', true);
+                return;
+            }
+
+            try {
+                // Create a temporary form to download the file
+                const base64Data = itemData.content.split(',')[1];
+                const byteCharacters = atob(base64Data);
+                const byteNumbers = new Array(byteCharacters.length);
+                for (let i = 0; i < byteCharacters.length; i++) {
+                    byteNumbers[i] = byteCharacters.charCodeAt(i);
+                }
+                const byteArray = new Uint8Array(byteNumbers);
+                const blob = new Blob([byteArray]);
+
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = itemData.filename || 'download';
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+                document.body.removeChild(a);
+
+                showHistoryItemStatus(button, '✓ Downloaded!', false);
+            } catch (error) {
+                console.error('Download error:', error);
+                showHistoryItemStatus(button, 'Download failed', true);
             }
         }
     </script>
