@@ -100,7 +100,7 @@ environment:
 
 - **Multi-user support** with individual accounts and clipboard histories
 - **Clipboard history** - Access your previous clipboard entries
-- **Real-time sync** across all devices with long-polling
+- **Real-time sync** across all devices with push notifications
 - **Text and image support** (PNG, JPG, GIF)
 - **Native clients** for macOS, Windows, and Linux
 - **Push notifications** so your clients know when the central clipboard has changed
