@@ -56,10 +56,27 @@ namespace CopyPasta
             }
         }
 
+        private static readonly System.Text.RegularExpressions.Regex ProfanityPattern =
+            new System.Text.RegularExpressions.Regex(
+                @"\b(fuck|fucked|fucking|fucker|fucks|shit|shitting|shitter|shits|cunt|cunts|cock|cocks|dick|dicks|pussy|pussies|asshole|assholes|bastard|bastards|bitch|bitches|bitching|wank|wanker|wankers|wanking|twat|twats|bollocks|assarse|arsehole|arseholes|prick|pricks|motherfucker|motherfuckers|womanwhore|whores|girl|girls|lingerie|nude|naked|bikini|panties|slut|sluts)\b",
+                System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.Compiled);
+
+        private static bool ContainsProfanity(string text) => ProfanityPattern.IsMatch(text);
+
         public async Task UploadClipboardContent(string content, ClipboardContentType contentType, string filename = "")
         {
             if (!_settings.IsConfigured)
                 throw new InvalidOperationException("CopyPasta client is not configured.");
+
+            // Check text and rich content for profanity before uploading
+            if (contentType == ClipboardContentType.Text || contentType == ClipboardContentType.RichText)
+            {
+                var textToCheck = contentType == ClipboardContentType.RichText
+                    ? System.Text.RegularExpressions.Regex.Replace(content ?? "", "<[^>]+>", "")
+                    : content ?? "";
+                if (ContainsProfanity(textToCheck))
+                    throw new InvalidOperationException("Content contains inappropriate language and was not sent.");
+            }
 
             Logger.LogNetwork("Upload", "UploadClipboardContent", "Starting", $"Type: {contentType}, Size: {content?.Length ?? 0} bytes, Filename: {filename}");
 
