@@ -728,23 +728,6 @@ Your username: ${document.querySelector('.logout-btn') ? 'Logged in' : 'Not logg
             }, 3000);
         }
 
-        const _blockedWords = [
-            "fuck","fucked","fucking","fucker","fucks","shit","shitting","shitter","shits",
-            "cunt","cunts","cock","cocks","dick","dicks","pussy","pussies",
-            "asshole","assholes","bastard","bastards","bitch","bitches","bitching",
-            "wank","wanker","wankers","wanking","twat","twats","bollocks","ass"
-            "arse","arsehole","arseholes","prick","pricks","motherfucker","motherfuckers", "woman"
-            "whore","whores","girl","girls","lingerie","nude","naked","bikini","panties","slut","sluts"
-        ];
-        const _profanityPattern = new RegExp(
-            '\\b(' + _blockedWords.map(w => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|') + ')\\b',
-            'i'
-        );
-
-        function hasProfanity(text) {
-            return _profanityPattern.test(text);
-        }
-
         async function pasteContent(type = null, content = null, filename = null) {
             try {
                 let contentType = type || detectContentType();
@@ -766,17 +749,6 @@ Your username: ${document.querySelector('.logout-btn') ? 'Logged in' : 'Not logg
                         contentType = 'text';
                         contentData = pasteArea.textContent;
                         showStatus('pasteStatus', `Saving as plain text...`, false);
-                    }
-                }
-
-                // Client-side profanity check for text content
-                if ((contentType === 'text' || contentType === 'rich') && contentData) {
-                    const checkText = contentType === 'rich'
-                        ? contentData.replace(/<[^>]+>/g, '')
-                        : contentData;
-                    if (hasProfanity(checkText)) {
-                        showStatus('pasteStatus', 'Content contains inappropriate language and was not saved', true);
-                        return;
                     }
                 }
 

@@ -87,46 +87,9 @@ class CopyPastaClient {
         }
     }
     
-    private static let profanityPattern: NSRegularExpression? = {
-        let words = [
-            "fuck","fucked","fucking","fucker","fucks","shit","shitting","shitter","shits",
-            "cunt","cunts","cock","cocks","dick","dicks","pussy","pussies",
-            "asshole","assholes","bastard","bastards","bitch","bitches","bitching",
-            "wank","wanker","wankers","wanking","twat","twats","bollocks","ass",
-            "arse","arsehole","arseholes","prick","pricks","motherfucker","motherfuckers", "woman",
-            "whore","whores","girl","girls","lingerie","nude","naked","bikini","panties","slut","sluts"
-        ]
-        let pattern = "\\b(" + words.joined(separator: "|") + ")\\b"
-        return try? NSRegularExpression(pattern: pattern, options: .caseInsensitive)
-    }()
-
-    private func containsProfanity(_ text: String) -> Bool {
-        guard let pattern = CopyPastaClient.profanityPattern else { return false }
-        let range = NSRange(text.startIndex..., in: text)
-        return pattern.firstMatch(in: text, options: [], range: range) != nil
-    }
-
-    private func stripHTML(_ html: String) -> String {
-        guard let data = html.data(using: .utf8),
-              let attributed = try? NSAttributedString(
-                data: data,
-                options: [.documentType: NSAttributedString.DocumentType.html],
-                documentAttributes: nil)
-        else { return html }
-        return attributed.string
-    }
-
     func uploadClipboardContent(content: String, type: ClipboardContentType, filename: String? = nil) async throws {
         guard let settings = settings, settings.isConfigured else {
             throw CopyPastaError.notConfigured
-        }
-
-        // Check text and rich content for profanity before uploading
-        if type == .text || type == .richText {
-            let textToCheck = type == .richText ? stripHTML(content) : content
-            if containsProfanity(textToCheck) {
-                throw CopyPastaError.profanityDetected
-            }
         }
 
         Logger.logNetwork("Upload", "UploadClipboardContent", "Starting", "Type: \(type), Size: \(content.count) bytes")
@@ -340,8 +303,7 @@ enum CopyPastaError: Error, LocalizedError {
     case authenticationFailed
     case httpError(Int)
     case networkError
-    case profanityDetected
-
+    
     var errorDescription: String? {
         switch self {
         case .notConfigured:
@@ -352,8 +314,6 @@ enum CopyPastaError: Error, LocalizedError {
             return "HTTP error: \(code)"
         case .networkError:
             return "Network error"
-        case .profanityDetected:
-            return "Content contains inappropriate language and was not sent"
         }
     }
 }

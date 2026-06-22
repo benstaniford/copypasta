@@ -1,6 +1,5 @@
 from flask import Flask, render_template, jsonify, request, session, redirect, url_for
 import os
-import re
 import logging
 from functools import wraps
 import base64
@@ -10,7 +9,6 @@ from werkzeug.utils import secure_filename
 from PIL import Image
 import io
 from version import get_cached_version, get_numeric_version
-from profanity_filter import contains_profanity
 
 app = Flask(__name__)
 
@@ -131,15 +129,6 @@ def paste():
 
         if not content:
             return jsonify({'error': 'No content provided'}), 400
-
-        # Apply profanity filter to text-based content
-        if content_type in ('text', 'rich'):
-            text_to_check = content
-            if content_type == 'rich':
-                # Strip HTML tags before checking
-                text_to_check = re.sub(r'<[^>]+>', '', content)
-            if contains_profanity(text_to_check):
-                return jsonify({'error': 'Content contains inappropriate language and was not saved'}), 400
 
         # Handle different content types
         if content_type == 'image':
