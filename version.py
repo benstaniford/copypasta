@@ -9,6 +9,11 @@ def get_version():
     Get the current application version from git tags or fallback to a default.
     Returns the version string in the format 'v1.0.0' or fallback.
     """
+    # Prefer explicitly set version (e.g. baked in at Docker build time)
+    env_version = os.environ.get('APP_VERSION')
+    if env_version:
+        return env_version
+
     try:
         # Try to get version from git tags
         result = subprocess.run(
@@ -34,8 +39,7 @@ def get_version():
     except Exception as e:
         logger.warning(f"Error getting version from git: {e}")
     
-    # Fallback to environment variable or default
-    fallback_version = os.environ.get('APP_VERSION', 'v0.0.0-unknown')
+    fallback_version = 'v0.0.0-unknown'
     logger.info(f"Using fallback version: {fallback_version}")
     return fallback_version
 
