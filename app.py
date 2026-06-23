@@ -17,6 +17,17 @@ app.secret_key = os.environ.get('SECRET_KEY', 'your-secret-key-change-this-in-pr
 # Configure maximum upload size (default 50MB)
 app.config['MAX_CONTENT_LENGTH'] = int(os.environ.get('MAX_UPLOAD_SIZE', 52428800))
 
+# Load profanity filter word list from environment variable
+_raw_filter_words = os.environ.get('PROFANITY_FILTER_WORDS', '')
+PROFANITY_FILTER = [w.strip().lower() for w in _raw_filter_words.split(',') if w.strip()] if _raw_filter_words else []
+
+def contains_profanity(text):
+    """Return True if text contains any word from the profanity filter list."""
+    if not PROFANITY_FILTER:
+        return False
+    lower = text.lower()
+    return any(word in lower for word in PROFANITY_FILTER)
+
 # Configure session to be permanent and last forever
 app.permanent_session_lifetime = timedelta(days=365 * 10)  # 10 years
 
@@ -43,6 +54,8 @@ logger.info(f"🚀 CopyPasta v{numeric_version} starting up...")
 # Initialize database on startup
 init_db()
 logger.info("📋 Database initialized successfully")
+if PROFANITY_FILTER:
+    logger.info(f"🚫 Profanity filter active ({len(PROFANITY_FILTER)} words)")
 
 def login_required(f):
     """Decorator to require authentication for routes"""
@@ -182,6 +195,10 @@ def paste():
             # Basic validation - ensure it's not too large
             if len(content) > 10000000:  # 10MB limit for rich content
                 return jsonify({'error': 'Rich content too large (max 10MB)'}), 400
+
+        # Apply profanity filter to text and rich content
+        if content_type in ('text', 'rich') and contains_profanity(content):
+            return jsonify({'error': 'Content rejected: contains prohibited words'}), 400
 
         # Save to database
         metadata = {
