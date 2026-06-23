@@ -98,6 +98,7 @@ jobs:
           tags: |
             nerwander/copypasta:${{ steps.version.outputs.VERSION }}
             nerwander/copypasta:latest
+          build-args: APP_VERSION=${{ steps.version.outputs.VERSION }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 

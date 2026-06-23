@@ -38,6 +38,9 @@ COPY version.py .
 COPY gunicorn.conf.py .
 COPY templates/ templates/
 
+ARG APP_VERSION
+ENV APP_VERSION=${APP_VERSION}
+
 # Create a non-root user for security
 RUN adduser --disabled-password --gecos '' appuser && \
     chown -R appuser:appuser /app
