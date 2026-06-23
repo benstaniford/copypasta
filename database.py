@@ -7,7 +7,9 @@ import time
 import hashlib
 import secrets
 
-DATABASE_PATH = os.path.join(os.path.dirname(__file__), 'clipboard.db')
+_data_dir = os.path.join(os.path.dirname(__file__), 'data')
+os.makedirs(_data_dir, exist_ok=True)
+DATABASE_PATH = os.path.join(_data_dir, 'clipboard.db')
 
 # Global lock and condition for clipboard change notifications
 _clipboard_lock = threading.Lock()
