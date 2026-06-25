@@ -37,46 +37,70 @@ jobs:
           sed -i '' 's/MARKETING_VERSION = 1.0;/MARKETING_VERSION = ${{ steps.version.outputs.NUMERIC_VERSION }};/g' CopyPasta.xcodeproj/project.pbxproj
           echo "Updated project version to ${{ steps.version.outputs.NUMERIC_VERSION }}"
 
-      - name: Build macOS app (Intel only)
+      - name: Build macOS app (Intel)
         run: |
           cd macos
-          echo "Building CopyPasta for Intel..."
+          echo "Building CopyPasta for Intel (x86_64)..."
           xcodebuild -project CopyPasta.xcodeproj \
             -scheme CopyPasta \
             -configuration Release \
             -arch x86_64 \
-            -derivedDataPath build \
+            -derivedDataPath build-intel \
             build
-          
-          # Copy the built app
-          cp -R build/Build/Products/Release/CopyPasta.app ./
-          echo "✓ Build completed successfully"
 
-      - name: Create DMG
+          cp -R build-intel/Build/Products/Release/CopyPasta.app ./CopyPasta-intel.app
+          echo "✓ Intel build completed"
+
+      - name: Build macOS app (Apple Silicon)
         run: |
           cd macos
-          echo "Creating DMG installer..."
-          
-          # Create a temporary directory for DMG contents
-          mkdir -p dmg-contents
-          cp -R CopyPasta.app dmg-contents/
-          
-          # Create symlink to Applications folder
-          ln -s /Applications dmg-contents/Applications
-          
-          # Create DMG
+          echo "Building CopyPasta for Apple Silicon (arm64)..."
+          xcodebuild -project CopyPasta.xcodeproj \
+            -scheme CopyPasta \
+            -configuration Release \
+            -arch arm64 \
+            -derivedDataPath build-arm64 \
+            build
+
+          cp -R build-arm64/Build/Products/Release/CopyPasta.app ./CopyPasta-arm64.app
+          echo "✓ Apple Silicon build completed"
+
+      - name: Create Intel DMG
+        run: |
+          cd macos
+          mkdir -p dmg-intel
+          cp -R CopyPasta-intel.app dmg-intel/CopyPasta.app
+          ln -s /Applications dmg-intel/Applications
           hdiutil create -volname "CopyPasta ${{ steps.version.outputs.NUMERIC_VERSION }}" \
-            -srcfolder dmg-contents \
+            -srcfolder dmg-intel \
             -ov -format UDZO \
             CopyPasta-${{ steps.version.outputs.NUMERIC_VERSION }}-intel.dmg
-          
-          echo "✓ DMG created: CopyPasta-${{ steps.version.outputs.NUMERIC_VERSION }}-intel.dmg"
+          echo "✓ Intel DMG created"
 
-      - name: Upload macOS artifact
+      - name: Create Apple Silicon DMG
+        run: |
+          cd macos
+          mkdir -p dmg-arm64
+          cp -R CopyPasta-arm64.app dmg-arm64/CopyPasta.app
+          ln -s /Applications dmg-arm64/Applications
+          hdiutil create -volname "CopyPasta ${{ steps.version.outputs.NUMERIC_VERSION }}" \
+            -srcfolder dmg-arm64 \
+            -ov -format UDZO \
+            CopyPasta-${{ steps.version.outputs.NUMERIC_VERSION }}-apple-silicon.dmg
+          echo "✓ Apple Silicon DMG created"
+
+      - name: Upload Intel artifact
         uses: actions/upload-artifact@v4
         with:
-          name: copypasta-macos-${{ steps.version.outputs.NUMERIC_VERSION }}
+          name: copypasta-macos-intel-${{ steps.version.outputs.NUMERIC_VERSION }}
           path: macos/CopyPasta-${{ steps.version.outputs.NUMERIC_VERSION }}-intel.dmg
+          retention-days: 30
+
+      - name: Upload Apple Silicon artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: copypasta-macos-apple-silicon-${{ steps.version.outputs.NUMERIC_VERSION }}
+          path: macos/CopyPasta-${{ steps.version.outputs.NUMERIC_VERSION }}-apple-silicon.dmg
           retention-days: 30
 
       - name: Summary
@@ -85,13 +109,16 @@ jobs:
           echo "✅ **macOS app built successfully**" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Version:** ${{ steps.version.outputs.NUMERIC_VERSION }}" >> $GITHUB_STEP_SUMMARY
-          echo "**Architecture:** Intel (x86_64)" >> $GITHUB_STEP_SUMMARY
-          echo "**Artifact:** CopyPasta-${{ steps.version.outputs.NUMERIC_VERSION }}-intel.dmg" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "📦 The DMG file has been uploaded as an artifact and will be available for 30 days." >> $GITHUB_STEP_SUMMARY
+          echo "| Architecture | Artifact |" >> $GITHUB_STEP_SUMMARY
+          echo "| --- | --- |" >> $GITHUB_STEP_SUMMARY
+          echo "| Intel (x86_64) | CopyPasta-${{ steps.version.outputs.NUMERIC_VERSION }}-intel.dmg |" >> $GITHUB_STEP_SUMMARY
+          echo "| Apple Silicon (arm64) | CopyPasta-${{ steps.version.outputs.NUMERIC_VERSION }}-apple-silicon.dmg |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "📦 Both DMG files have been uploaded as artifacts and will be available for 30 days." >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Installation Instructions" >> $GITHUB_STEP_SUMMARY
-          echo "1. Download the artifact from this workflow run" >> $GITHUB_STEP_SUMMARY
+          echo "1. Download the artifact matching your Mac's architecture" >> $GITHUB_STEP_SUMMARY
           echo "2. Extract the ZIP file to get the DMG" >> $GITHUB_STEP_SUMMARY
           echo "3. Open the DMG file" >> $GITHUB_STEP_SUMMARY
           echo "4. Drag CopyPasta.app to the Applications folder" >> $GITHUB_STEP_SUMMARY
